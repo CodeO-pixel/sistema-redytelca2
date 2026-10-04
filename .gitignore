@@ -1,0 +1,67 @@
+# ============================================================
+# .gitignore — REDYTELCA
+# ============================================================
+
+# --- Base de datos ---
+# NO subir el dump SQL: contiene PII de clientes y hashes.
+# Hallazgo AUD-2026-S01. Se conserva local, nunca en el repo.
+bd_redytelca.sql
+
+# --- Dependencias (si algún día se instalan) ---
+/vendor/
+/node_modules/
+composer.lock
+package-lock.json
+
+# --- Configuración local ---
+.env
+.env.local
+*.local.php
+config.local.php
+
+# --- Archivos subidos por usuarios ---
+/uploads/
+!uploads/.gitkeep
+
+# --- Logs ---
+*.log
+logs/
+xamppfiles/
+*.pid
+
+# --- Cache y temporales ---
+/cache/
+/tmp/
+*.tmp
+*.cache
+
+# --- Cobertura de tests ---
+coverage/
+.phpunit.result.cache
+.phpunit.cache
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.code-workspace
+.phpstorm.meta.php
+*.sublime-project
+*.sublime-workspace
+
+# --- Sistema operativo ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Respaldos de archivos ---
+*.bak
+*.backup
+*~
+
+# --- Documentos obsoletos (archivados, no se versionan) ---
+docs/archive/
+
+# --- Metodología personal ---
+# Material del curso y notas personales no forman parte del proyecto.
+Apuntes-*.pdf
+metodologia*.md
