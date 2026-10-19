@@ -13,10 +13,10 @@ Estado operativo entre sesiones. **Único documento de estado del proyecto.**
 
 ## Estado actual
 
-- **Fase 1 — MVC CERRADA** (excepto 139e y 140).
-  - Cerradas: 134, 135, 136, 137, 138, 139a, 139b, 139c, **139d**.
+- **Fase 1 — MVC CERRADA** (excepto 140).
+  - Cerradas: 134, 135, 136, 137, 138, 139a, 139b, 139c, **139d**, **139e**.
   - En progreso: ninguna.
-  - Pendientes: **139e** (estructura `public/` + `src/`, aprobada 2026-10-18, se ejecuta antes de 140), **140** (frontend modular).
+  - Pendientes: **140** (frontend modular).
 - **BD cerrada (2026-10-16).** 44 tablas. Convención `PK=id` / `FK=tabla_id`. `logs`→`auditoria_logs`. 145 triggers, 4 vistas, 41 CHECKs. Vive en el histórico del ROADMAP.
 - **0 endpoints caídos.** Los 13 endpoints de la Fase 1 quedaron reactivados: 5 de roles/permisos en Tanda C, 2 de empresa en Tanda D, y los 6 de infra/soporte en 139c. `conexion.php` **eliminado** en Tanda E.
 - **`app.js` e `index.html` son de 140** (frontend viejo, no tocado en 139). Frontend viejo manda `id_*` (pre-B28), backend nuevo espera `*_id` (post-ADR 016) — frontend viejo no puede crear ni editar. Deuda 139b-3.
@@ -40,7 +40,7 @@ MVC completo sin framework. Namespaces PSR-4, DI por constructor, repositorios, 
 | 139b | Servicio, Contrato, Plan, Factura, Pago, MetodoPago + 8 thin endpoints | ✅ cerrada (26/26 curl+SQL, 2 bugs fixed) |
 | 139c | Nodo, Olt, Nap, Equipo, Ticket, Tarea, Pedido + 7 thin endpoints (1 nuevo) + migración pedidos-rbac | ✅ cerrada (39/39 curl+SQL, migración verificada) |
 | 139d | Rol, Permiso, Empresa + 7 thin + `branding.css.php` reescrito + migrar `tests/audit_context.test.php` + borrar `conexion.php`. **5 tandas, 59/59 verde.** Cierra Fase 1 MVC. | ✅ cerrada |
-| 139e | Estructura de despliegue: mover `core/`, `controllers/`, `services/`, `repositories/`, `models/`, `validators/`, `tests/` a `src/`; mover thin files + `index.html` + `app.js` + `styles.css` + `Logos/` + `uploads/` a `public/`; actualizar `require` y `Bootstrap.php`; `.htaccess` fallback. Cierra la exposición del código fuente al webroot. ADR 018 al cerrar Tanda E. | ⏳ pendiente |
+| 139e | Estructura de despliegue: mover `core/`, `controllers/`, `services/`, `repositories/`, `models/`, `validators/`, `tests/` a `src/`; mover thin files + `index.html` + `app.js` + `styles.css` + `Logos/` + `uploads/` a `public/`; actualizar `require` y `Bootstrap.php`; `.htaccess` fallback. Cierra la exposición del código fuente al webroot. ADR 018 al cerrar Tanda E. | ✅ cerrada |
 | 140 | frontend modular (`js/`) + borrar `app.js` | ⏳ pendiente |
 
 **Orden:** 134 → 135 → 136 → 137 → 138 → 139a → 139b → 139c → 139d → **139e** → 140.
@@ -90,8 +90,7 @@ Deudas documentadas: 139c-1 (7 index sin JOINs), 139c-2 (sidebar pedidos sin sho
 
 ## Próximos pasos
 
-1. **Spec 139e** — Fase 1. Estructura de despliegue (`public/` + `src/`). Se ejecuta entre 139d y 140. Cierra la exposición del código fuente al webroot. ADR 018 se redacta al cerrar 139e.
-2. **Spec 140** — Fase 1. Frontend modular (`js/`) + borrar `app.js`.
+1. **Spec 140** — Fase 1. Frontend modular (`js/`) + borrar `app.js`.
 3. **Fase 2 — Deudas heredadas de MVC** (BUG-6.1, DOC-04/05/08/09, EST-02/03, 060, deudas de contrato).
 4. **Fase 3 — UI/UX bonita** (078–085).
 5. **Fase 4 — Botón Roles + permisos en grilla** (084 + tareas sin número).
@@ -117,7 +116,9 @@ Deudas documentadas: 139c-1 (7 index sin JOINs), 139c-2 (sidebar pedidos sin sho
 
 | ID | Sev | Descripción | Origen | Spec | ¿Bloquea defensa? |
 |---|---|---|---|---|---|
-| **139e-webroot** | Media | `core/`, `controllers/`, `services/`, `repositories/`, `models/`, `validators/`, `tests/` están dentro del webroot. Cualquier URL a esos archivos los ejecuta. Mitigación correcta: sacar el código a `src/` y dejar solo `public/` accesible. Sin `.htaccess` en raíz hoy. | [audit-turno] | 139e | **No** (no rompe funcionalidad; riesgo de exposición) |
+
+**Cerradas al cierre de 139e (histórico):**
+- **139e-webroot** — código movido a `src/`, thin files a `public/`. `core/Config.php` por URL -> 404. `.htaccess` raíz conservado como defensa en profundidad. ADR 018. Verificado E2E (6.10, 6.11, 6.12).
 
 **Cerradas al cierre de 139d (histórico):**
 - **139d-endpoints** — 2 endpoints con columnas viejas post-B28 (`api_empresa`, `api_empresa_publica`). ✅ cerrada en Tanda D.
@@ -183,13 +184,13 @@ Deudas documentadas: 139c-1 (7 index sin JOINs), 139c-2 (sidebar pedidos sin sho
 
 | Categoría | Total | Bloquean defensa |
 |---|---|---|
-| A. Fase 1 (bloqueantes) | 1 | **0** |
+| A. Fase 1 (bloqueantes) | 0 | **0** |
 | B. Contrato (heredadas de MVC) | 9 | 0 |
 | C. Fases futuras (2–7) | 13 | 0 |
 | D. Documentales vivas | 5 | 0 |
 | D. Documentales auto-resueltas | 5 | — |
 | Bugs (3 fixed) | 3 | 0 |
-| **Total deudas vivas** | **28** | **0** |
+| **Total deudas vivas** | **27** | **0** |
 
 ---
 
@@ -390,6 +391,14 @@ Dos decisiones arquitectónicas implementadas sin ADR formal:
 - **`<?php` debe ser la primera línea del archivo (byte 0).** Comentario `// filename` va en línea 2, no antes. Un `// filename` antes de `<?php` se emite como output literal antes del parseo; `header()` falla con "headers already sent" y el body JSON/CSS llega con prefijo de texto. En Tanda D, AI Studio devolvió los 4 archivos con `// filename` en línea 1; rechazados, reordenados manualmente.
 - **Sobrescribir archivo completo, no solo la línea a cambiar.** En Tanda E, se aplicó el `<?php` corregido del test migrado pero no se sobrescribió el resto del archivo: los 2 comentarios obsoletos (`// Depende de que conexion.php tenga el guard CLI`) y el `require_once conexion.php` original seguían en su lugar. Síntoma: `findstr` seguía devolviendo 3 hits. Lección: al reescribir un archivo, `Ctrl+A` + `Supr` + pegar completo, nunca editar por partes.
 - **`tests/audit_context.test.php` era el único bloqueante del borrado de `conexion.php`.** `AGENTS.md` ya lo declaraba como "se migra a `core/Auth.php` en 139d (ítem explícito de esa spec)". El plan de Tanda E (§6, paso 7) asumía `php tests/run.php` verde sin mencionar la migración. Lección: cruzar el plan contra las deudas conocidas del dump antes de ejecutar el borrado. El orden correcto es: (1) migrar el archivo, (2) verificar 0 refs, (3) borrar `conexion.php`, (4) correr harness.
+
+- **Bug latente del router con `php -S`.** `public/router.php` tenia `$path = __DIR__ . $uri;` sin slash. Con Apache no se ejecuta (`.htaccess` con `RewriteCond !-f` solo invoca el router para rutas no existentes). Con `php -S` + router script, el router se ejecuta siempre y el fallback devolvia 404 a `/login.php`. Fix: `return false;` en el fallback. `php -S` sirve el archivo y lo ejecuta como PHP. Ver ADR 018.
+
+- **`debug_login.php` colateral.** El script temporal con credenciales hardcodeadas (`admin` / `admin123`) se colo al primer commit de 139e. Borrado en commit siguiente. Regla: los scripts de diagnostico que contienen credenciales se borran ANTES del `git add -A`, o se crean fuera de `src/tests/`.
+
+- **MariaDB se apaga solo.** Durante la verificacion E2E, MariaDB se detuvo sin razon aparente. El 500 de `/login.php` con `"Error de base de datos"` era el PDOException 2002 mapeado a 500 generico. Leccion: cuando aparezca 500 en runtime y el codigo no cambio, verificar `netstat -ano | findstr :3306` ANTES de tocar codigo.
+
+- **`Set-Content -Encoding UTF8` en PowerShell 5.1 agrega BOM.** Tambien corrompe caracteres no-ASCII que vienen de cmd (CP850) → mojibake doble. Para archivos UTF-8 sin BOM: `[System.IO.File]::WriteAllText($p, $c, (New-Object System.Text.UTF8Encoding $false))` con `$c` ya construido desde strings ASCII. Si el contenido necesita acentos, construir via `[char]0xNNNN` para cada caracter no-ASCII. Aplicado al ADR 018.
 
 Aprendizajes completos: `docs/REFERENCIA.md` §4.
 Lecciones de verificación: `docs/VERIFICACION.md`.
