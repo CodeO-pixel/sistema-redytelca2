@@ -315,6 +315,32 @@ retornar `findByToken($token) !== null`. Docblock actualizado.
 5. **El agente no ejecuta comandos.** Los da. El humano los corre.
 
 **Aplicación:** todo el ciclo 139b–139d, y por extensión cualquier spec que dependa de frontend viejo.
+### 2.11 - `php -S` con router script: el router se invoca para toda peticion, incluyendo archivos existentes
+
+**Origen:** 139e, cierre del move a `public/` + `src/` (2026-10-19).
+
+**Que paso:** el plan 139e indicaba `php -S localhost:8000 -t public` para dev local. Con ese comando, el router `public/router.php` no se ejecuta. El primer test E2E dio 404 en `/` porque `index.html` existe pero el servidor embebido no lo sirve como index automatico sin router. Se paso a `php -S localhost:8000 -t public public/router.php`. El router se ejecuta para toda peticion, incluyendo archivos existentes (ej. `/login.php`).
+
+El router tenia un fallback roto:
+
+```
+$path = __DIR__ . $uri;
+if (file_exists($path) && is_file($path)) { readfile($path); exit; }
+http_response_code(404);
+```
+
+Con `__DIR__` = `public/` y `$uri` = `login.php`, la concatenacion daba `publiclogin.php` (sin slash). 404 en todos los thin files. Y si se corrigiera la concatenacion, `readfile()` serviria el codigo fuente PHP en vez de ejecutarlo.
+
+**Por que no se detecto antes:** con Apache, el `.htaccess` de la raiz tiene `RewriteCond %{REQUEST_FILENAME} !-f`. Solo invoca al router si el archivo NO existe. `/login.php` existe, Apache lo sirve directo. El router nunca se usa para archivos existentes. El fallback roto era inalcanzable.
+
+**Regla derivada:**
+
+1. Con `php -S`, usar SIEMPRE `php -S host:port -t public public/router.php`. Sin el router script, el servidor embebido no ejecuta `router.php` y las rutas limpias (`/cliente`, `/admin`) dan 404.
+2. En un router script de `php -S`, el fallback es `return false;`, no `readfile()` ni `http_response_code(404)`. `return false;` delega al servidor: sirve el archivo y lo ejecuta si es PHP. `readfile()` devuelve el texto del archivo (expone el codigo fuente).
+3. `findstr /C:...` con backtick o acentos puede dar falso negativo desde cmd (CP850). Verificar con `powershell -Command $c = Get-Content file -Raw; $c -match 'pattern'`.
+
+**Aplicacion:** `public/router.php` corregido en 139e. `README.md` y `AGENTS.md` actualizados con el comando correcto. ADR 018 documenta el trade-off. Verificado E2E con `curl` a 12 endpoints (6.1-6.12).
+
 ---
 
 ## 3. Checklist de verificación (todo bloque con backend)
