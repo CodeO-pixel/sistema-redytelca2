@@ -16,8 +16,8 @@ Auditoría de hallazgos: `AUDITORIA_2026.md`. Estado operativo: `MEMORY.md`.
 ## Estado actual
 
 - **Fase activa:** 1 — MVC
-- **Siguiente:** 139e (estructura `public/` + `src/`)
-- **Cerradas:** 52 · **En progreso:** 0 · **Pendientes:** ~101 filas (~66 padres)
+- **Siguiente:** 140 (frontend modular)
+- **Cerradas:** 53 · **En progreso:** 0 · **Pendientes:** ~100 filas (~65 padres)
 
 ---
 
@@ -36,7 +36,8 @@ Cierra el Bloque 29. Reactiva 13 endpoints caídos. Al terminar: 20 controllers,
 | 139a | controllers auth | Auth, Perfil, Usuario, Cliente + 14 thin endpoints. | ✅ |
 | 139b | controllers finanzas | Servicio, Contrato, Plan, Factura, Pago, MetodoPago + 8 thin. | ✅ |
 | 139c | controllers infra/soporte | Nodo, Olt, Nap, Equipo, Ticket, Tarea, Pedido + 7 thin (6 reescritos + `api_pedidos` nuevo). Migración `2026-10-18-139c-pedidos-rbac.sql`. | ✅ |
-| 139e | estructura despliegue | Mover `core/`, `controllers/`, `services/`, `repositories/`, `models/`, `validators/`, `tests/` a `src/`. Mover thin files + `index.html` + `app.js` + `styles.css` + `Logos/` + `uploads/` a `public/`. Actualizar `require`, `Bootstrap.php`, `router.php`, `.htaccess` fallback. Cierra la exposición del código fuente al webroot. ADR 018. | ⏳ |
+| 139d | controllers config | Rol, Permiso, Empresa + 7 thin + `branding.css.php` reescrito + migrar `tests/audit_context.test.php` + borrar `conexion.php`. 5 tandas, 59/59 verde. Cierra Fase 1 MVC. | ✅ |
+| 139e | estructura despliegue | Mover `core/`, `controllers/`, `services/`, `repositories/`, `models/`, `validators/`, `tests/` a `src/`. Mover thin files + `index.html` + `app.js` + `styles.css` + `Logos/` + `uploads/` a `public/`. Actualizar `require`, `Bootstrap.php`, `router.php`, `.htaccess` fallback. Cierra la exposición del código fuente al webroot. ADR 018. | ✅ |
 | 140 | frontend js/ | Reescribir `app.js` en `js/core|models|views|controllers/`. Adaptar `index.html`. Borrar `app.js`. | ⏳ |
 
 **Reglas heredadas de 139b:**
@@ -53,10 +54,13 @@ Cierra el Bloque 29. Reactiva 13 endpoints caídos. Al terminar: 20 controllers,
 - Tests de escritura RBAC con rol dummy (`test_139d_rol_perm`), nunca con seed. Cascada limpia `rol_modulo*`.
 - Body JSON en CLI de Windows viaja por base64.
 
-**Reglas heredadas de 139e (aprobada 2026-10-18):**
+**Reglas heredadas de 139e:**
 - Se ejecuta entre 139d y 140, con ADR 018.
 - `git tag pre-139e` + backup BD antes de mover archivos.
 - Criterio de cierre: `grep -r "conexion.php"` → 0, `core/Config.php` por URL → 403/404, E2E login + api_* + branding + portal → 200.
+- `Logos/convert_logo.php` eliminado (script de un solo uso, logo ya convertido).
+- `public/router.php` requiere `return false;` en el fallback para servir thin files con `php -S`.
+- Comando de arranque dev: `php -S localhost:8000 -t public public/router.php`.
 
 ---
 
@@ -267,6 +271,7 @@ Continúa el orden después de Fase 6. Sin pre-categorización. Se ejecutan en e
 
 | Spec | Nombre | Cerrada en |
 |---|---|---|
+| **139e** | **Estructura de despliegue (`public/` + `src/`) + ADR 018. Cierra Fase 1 MVC. 6.0a-d + 6.1-6.12 verde. 39 thin files (37 Bootstrap + router + portal), 154 PHP en `src/`, BD sin daño. Fix latente del router (`return false;`).** | **2026-10-19** |
 | **139d** | **Controllers config (Rol, Permiso, Empresa) + 7 thin + `branding.css.php` + migrar `tests/audit_context.test.php` + borrar `conexion.php`. 5 tandas, 59/59 verde (A 23 + B 6 + C 22 + D 8 + E 0-refs + harness 9/9). Cierra Fase 1 MVC.** | **2026-10-18** |
 | 28 | BD — Base de datos (44 tablas, migración completa) | 2026-10-16 |
 | 139c | Controllers infra/soporte (7 controllers + 7 thin, 39/39 verde) | 2026-10-18 |
@@ -375,4 +380,4 @@ Nada más. No hay otro lugar del archivo donde aparezca esa spec.
 - `GOBERNANZA.md` — mapa documental.
 - `MEMORY.md` — estado entre sesiones y hallazgos operativos.
 - `VERIFICACION.md` — lecciones de verificación.
-- `ADR/` — decisiones arquitectónicas (001–017).
+- `ADR/` — decisiones arquitectónicas (001–018).
