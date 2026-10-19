@@ -1,389 +1,464 @@
-# Auditoría REDYTELCA 2026
+# Auditoría completa de REDYTELCA
 
-Informe estático de auditoría sobre el sistema de gestión ISP REDYTELCA.
-Fecha: octubre 2026. Método: 6 pasadas × 10 capas × contexto ISP.
-Estándares: ANSI/INCITS 359, OWASP ASVS 5.0, ISO/IEC 25010:2023, ISO/IEC 27011:2024, ITU-T X.1051, NIST SP 800-63B Rev. 4.
+Aplico el marco de `docs/METODOLOGIA_AUDITORIA_IA.md` (6 pasadas × 10 capas × contexto ISP) contra el estado actual del proyecto (dumps `local-repo-converted (2).txt` + `bd_redytelca.sql`). Referencias comparativas: **SaaS Gestión**, **SmartOLT**, **Splynx** y estándares del sector (**TM Forum SID/eTOM**, **ISO/IEC 27011:2024**, **ITU-T X.1051**).
+
+**Fecha de corte: 2026-10-11.** Este informe es una foto con fecha. El estado de cada hallazgo (abierto / cerrado) vive en `ROADMAP.md`. El esquema vive en `bd_redytelca.sql`.
+
+---
 
 ## Resumen ejecutivo
 
-- Críticos: 8
-- Altos: 40
-- Medios: 24
-- Bajos: 8
-- Líneas rojas comprometidas: 6
+| Capa | Score | Estado | Críticos |
+|---|---|---|---|
+| 1. Datos / BD | 78 | Aceptable con reservas | 0 |
+| 2. Backend / API | 72 | Aceptable con reservas | 0 |
+| 3. Frontend | **38** | **Deficiente** | 0 |
+| 4. Seguridad | 68 | Deficiente | 0 |
+| 5. Arquitectura | 62 | Deficiente | 0 |
+| 6. Testing | 40 | Deficiente | 0 |
+| 7. Infraestructura | 45 | Deficiente | 0 |
+| 8. Documentación | 82 | Bueno | 0 |
+| 9. Calidad de Producto | 55 | Deficiente | 0 |
+| 10. Contexto ISP | 70 | Aceptable con reservas | 0 |
+| **Global** | **61** | **Deficiente** | **0** |
 
-Veredicto global: **NO CONFORME EN FASE 1 (Estructural)**. El esquema declara RBAC (ANSI/INCITS 359) pero el código no lo implementa.
+**Veredicto preliminar: no conforme a estándar profesional.** Fase 1 estructural ✅ conforme. Fase 2 interna ❌ no conforme (3 capas por debajo de 70). Fase 3 ISP ⚠️ parcial.
 
----
-
-## LÍNEAS ROJAS COMPROMETIDAS
-
-1. Protección de PII (S01, F01, F02)
-2. Aislamiento de clientes (B04)
-3. RBAC formal y SoD (001, 002)
-4. Integridad de facturación (B05, B07, B12, B13, ISP04)
-5. Auditabilidad de operaciones (B03, ISP02)
-6. Credenciales nunca en texto plano (B15, S07)
-
----
-
-## HALLAZGOS CRÍTICOS (8)
-
-### AUD-2026-001 — RBAC no conforme a ANSI/INCITS 359
-- Capa: Autorización
-- Estándar: ANSI/INCITS 359 (RBAC Core)
-- Evidencia: tabla `usuario_rol` (N:M) existe en `bd_redytelca.sql` pero ningún PHP la consulta. `conexion.php` (`requireStaffAuth`), `login.php`, `auth_state.php` leen `usuarios.id_rol` (escalar 1:N).
-- Impacto: el sistema no implementa RBAC Core. `usuario_rol` es artefacto muerto.
-- Línea roja: sí (RBAC formal).
-
-### AUD-2026-002 — Sin gate por operación
-- Capa: Autorización
-- Evidencia: `conexion.php` → `requirePageAccess()` verifica existencia en `rol_modulo_pagina`. No consulta `rol_modulo_permiso` ni `permisos`.
-- Impacto: un rol con visibilidad de "Pagos" puede crear/editar/eliminar. Técnico con acceso a Clientes puede borrar clientes.
-- Línea roja: sí (SoD).
-
-### AUD-2026-B01 — `$_SESSION` nativo en login/logout
-- Capa: Backend
-- Evidencia: `login.php` usa `session_start()` y `$_SESSION['auth_token']`. `logout.php` igual.
-- Viola: regla 7 de `copilot-instructions.md`.
-- Impacto: mecanismo de auth paralelo al de tokens.
-
-### AUD-2026-B02 — `usuarios.estado` no verificado en login
-- Capa: Backend
-- Evidencia: `login.php` solo valida `bloqueado_hasta`. Ignora `estado` ('Activo'/'Inactivo'/'Bloqueado').
-- Impacto: usuario Inactivo o Bloqueado puede loguearse.
-
-### AUD-2026-B03 — Auditoría inoperante
-- Capa: Backend
-- Evidencia: triggers `trg_*_audit_*` usan `COALESCE(@app_usuario_id, NULL)`. Búsqueda de `@app_usuario_id` en los 25 PHP: 0 resultados.
-- Impacto: todos los logs con `id_usuario=NULL, tipo_actor='sistema'`.
-- Línea roja: sí (auditabilidad).
-- Estado: en corrección (spec 001-fix-auditoria-logs).
-
-### AUD-2026-B04 — `must_change_password` solo enforced en cliente
-- Capa: Backend
-- Evidencia: `auth_state.php` devuelve el flag. `app.js` bloquea el modal. Ningún endpoint backend verifica el flag.
-- Impacto: usuario con contraseña temporal puede llamar directamente a `api_*.php`.
-- Línea roja: sí (aislamiento).
-
-### AUD-2026-B05 — Revertir pago validado por no-admin
-- Capa: Backend
-- Evidencia: `api_pagos.php` PUT. El gate `$cambioDeEstadoSensible && id_rol !== 1` solo aplica a `['validado','rechazado']`. `'pendiente'` no está.
-- Impacto: Operador puede revertir pagos validados.
-- Línea roja: sí (facturación).
-
-### AUD-2026-S01 — Dump SQL en webroot
-- Capa: Infraestructura
-- Evidencia: `bd_redytelca.sql` en raíz pública. Sin bloqueo `.htaccess` ni regla de servidor.
-- Impacto: PII de clientes, hashes bcrypt, topología de red expuestos.
-- Línea roja: sí (PII).
-
-### AUD-2026-F01 — Token en localStorage
-- Capa: Frontend
-- Evidencia: `app.js` → `persistSessionContext()` guarda el token en localStorage.
-- Impacto: XSS puede robar token de 30 días.
-- Línea roja: sí (PII).
-
-### AUD-2026-F02 — Token en query string
-- Capa: Frontend
-- Evidencia: `app.js` → `restoreSession()` envía token en `?token=...`.
-- Impacto: access logs del servidor capturan el token.
-- Línea roja: sí (PII).
+**El bloqueante real no es el backend** — es **frontend** (38/100) e **infraestructura** (45/100). Ahí está el 70% de la brecha con SaaS Gestión.
 
 ---
 
-## HALLAZGOS ALTOS (40)
+# CAPA 1 — Datos / Base de Datos
 
-### Backend
+**Estándares aplicados:** ISO/IEC 9075 (SQL), formas normales 1FN–BCNF, ACID, ISO/IEC 11179 (nomenclatura), ISO/IEC 27011:2024 §8.2 (gestión de activos).
 
-### AUD-2026-B06 — PUT devuelve success con 0 filas afectadas
-- Evidencia: patrón `$ok = $stmt->execute([...]); 'message' => $ok ? 'success' : 'error'`.
-- Archivos: `api_tareas.php`, `api_tickets.php`, `api_nodos.php`, `api_olts.php`, `api_naps.php`, `api_planes.php`, `api_contratos.php`.
-- Impacto: cliente cree que actualizó algo que no existía.
+## 1.1 Pasada 1 — Conformidad estructural
 
-### AUD-2026-B07 — INSERT bypassa validación de transiciones
-- Evidencia: triggers `trg_*_validar_transicion` son BEFORE UPDATE. No hay BEFORE INSERT.
-- Archivos: `bd_redytelca.sql` + todos los POST.
-- Impacto: POST con `estado='pagada'` crea factura pagada sin pago.
+**RBAC Core ANSI/INCITS 359:** ✅ CONFORME.
+- `usuario_rol` N:M ✅
+- `rol_modulo_permiso` N:M con (objeto=página × operación=permiso) ✅
+- `permisos` catálogo separado ✅
 
-### AUD-2026-B08 — UPDATE global en GET
-- Evidencia: `api_contratos.php` y `api_facturas.php` ejecutan `UPDATE ... SET estado=...` en cada GET.
-- Impacto: viola RFC 7231 (GET seguro). O(N) por request.
+**Máquina de estados finitos:** ✅ CONFORME.
+- `transicion_estado` con UNIQUE (tabla, origen, destino) ✅
+- Triggers BEFORE INSERT + BEFORE UPDATE en `facturas`, `pagos`, `contratos`, `servicios` ✅
 
-### AUD-2026-B09 — `api_empresa.php` GET público
-- Evidencia: GET sin `requireStaffAuth`.
-- Impacto: info disclosure (`impuesto_porcentaje`, `dia_facturacion`, `dias_gracia_mora`, `monto_recargo_mora`).
+## 1.2 Pasada 2 — Consistencia interna
 
-### AUD-2026-B10 — Errores con fuga de información
-- Evidencia: `'Error ...: ' . $e->getMessage()` expone mensajes de MariaDB al cliente.
-- Archivos: `api_planes.php`, `api_nodos.php`, `api_olts.php`, `api_naps.php`, `api_servicios.php`, `api_facturas.php`, `api_contratos.php`, `api_pagos.php`.
+| Hallazgo | Severidad | Evidencia |
+|---|---|---|
+| `clientes.cedula` sin CHECK de formato | Alto | Semilla muestra `'3192873'`, `'V-12345678'`, `'E-87654321'` — 3 formatos distintos |
+| `clientes` sin `actualizado_en` ni `estado` | Alto | Comparar con `usuarios` que sí los tiene |
+| `pagos` sin `creado_en`/`actualizado_en` | Medio | Auditoría temporal incompleta |
+| `nodos`, `olts`, `naps`, `equipos` sin timestamps | Medio | Cambios no trazables a nivel fila |
+| `logs.old_value`/`new_value` con `CHECK (json_valid())` — MariaDB 10.4 no lo fuerza | Alto | Documentado en D07 |
+| `sesiones` sin CHECK "exactamente uno de (id_usuario, id_credencial)" | Alto | Documentado en D08 |
+| `facturas.impuesto_aplicado` columna muerta | Medio | Se persiste, nunca se usa |
+| `configuracion_empresa` no garantiza singleton a nivel esquema | Medio | Asume `id_config=1` |
+| `rol` id=4 ("tecnico") huérfano | Medio | Sin `rol_modulo` ni `usuario_rol` |
+| `equipos` permite N por servicio, pero sin `estado_inventario` ni `fecha_asignacion` en el seed | Bajo | El DDL los tiene, el seed no los usa |
+| Falta tabla `auditoria_migraciones` (aunque hay logs) | Bajo | Trazabilidad de DDL |
+| `clientes_credenciales` sin `creado_en`/`ultimo_acceso` en el seed | Bajo | Tabla existe, no se usa |
 
-### AUD-2026-B11 — UNIQUE violations detectadas con `str_contains`
-- Evidencia: `api_equipos.php` distingue UNIQUE por `str_contains($e->getMessage(), 'direccion_mac')`.
-- Impacto: frágil ante cambios de versión MariaDB.
+## 1.3 Pasada 3 — Cross-layer
 
-### AUD-2026-B12 — `api_facturas.php` POST sin verificar duplicado
-- Evidencia: no hay UNIQUE `(id_servicio, periodo)` ni validación PHP.
-- Impacto: dos facturas del mismo mes al mismo servicio.
+- ✅ `bd_redytelca.sql` es fuente de verdad y coincide con el runtime PHP.
+- ⚠️ El dump se excluye del repo (`.gitignore` → `bd_redytelca.sql`). Correcto para seguridad, pero rompe la reproducibilidad de la tesis: un jurado no puede importar el esquema desde el repo. **Fix requerido:** versionar `bd_redytelca_schema.sql` **sin datos** (DDL puro) y mantener el dump con datos solo local.
 
-### AUD-2026-B13 — `registrar_cliente.php` id_plan=1 hardcodeado
-- Evidencia: `VALUES ('activo', ?, 1, 'Principal', ...)`.
-- Impacto: cliente queda en Plan Básico hasta cambio manual.
+## 1.4 Pasada 4 — Adversarial
 
-### AUD-2026-B14 — `cambiar_password.php` sin validación de fortaleza
-- Evidencia: sin longitud mínima, sin verificación contra listas comprometidas.
-- Viola: NIST SP 800-63B §5.1.1.2 (mínimo 15 chars cuando es único factor).
+- ✅ Prepared statements en 100% de los endpoints.
+- ⚠️ `logs` es inmutable (`trg_logs_inmutable_*`), pero las variables `@app_*` se resetean al cierre de conexión — si algún día se habilita `PDO::ATTR_PERSISTENT`, se contaminan entre requests. **Ya está documentado en `conexion.php`** ✅.
 
-### AUD-2026-B15 — `usuarios_crear.php` password temporal predecible
-- Evidencia: `$defaultPassword = 'Redytelca123!'` hardcoded.
-- Línea roja: sí (credenciales).
+## 1.5 Pasada 5 — No funcional
 
-### AUD-2026-B16 — `cliente_eliminar.php` sin anticipar FK contratos
-- Evidencia: FK `contratos.id_servicio` RESTRICT no considerada.
-- Impacto: operación falla con error genérico, rollback sin mensaje claro.
+- ❌ Índices ausentes: `clientes(cedula)` está ✅, pero falta índice en `facturas(fecha_vencimiento)`, `sesiones(token)` (está ✅ como UNIQUE), `logs(accion, creado_en)`, `equipos(direccion_mac)` (✅ UNIQUE).
+- ⚠️ Collation `utf8mb4_general_ci` en lugar de `utf8mb4_unicode_ci`. Impacta ordenamiento español.
 
-### AUD-2026-B17 — `permisos_listar.php` sin admin
-- Evidencia: no usa `$minRoleId`. Cualquier staff puede listar la matriz completa de páginas/roles.
+## 1.6 Comparación con SaaS Gestión
 
-### AUD-2026-B18 — `permisos_guardar.php` reemplaza sin confirmación
-- Evidencia: DELETE completo de `rol_modulo_pagina` + INSERT. Sin safeguard para rol 1.
+| Concepto | REDYTELCA | SaaS Gestión |
+|---|---|---|
+| Modelo SID (Cliente/Producto/Servicio/Recurso) | Parcial. `clientes`, `planes`, `servicios`, `equipos` — 4 de 6 entidades | Completo |
+| `Pedido` (Order) como entidad | ❌ No existe | ✅ Sí (`instalaciones`) |
+| `IPAM` | ✅ `ip_pools`, `ip_asignaciones` | ✅ |
+| Máquina de estados | ✅ Formal con tabla `transicion_estado` | Estado como ENUM, sin tabla formal |
 
-### AUD-2026-B19 — `api_pagos.php` DELETE permite borrar rechazados
-- Evidencia: solo bloquea `estado === 'validado'`.
-- Impacto: trazabilidad de rechazos perdida.
-
-### Base de datos
-
-### AUD-2026-D01 — `facturas.impuesto_aplicado` nunca usado
-- Evidencia: columna persiste snapshot pero ningún cálculo la lee.
-- Impacto: columna muerta.
-
-### AUD-2026-D02 — `clientes` sin `actualizado_en` ni `estado`
-- Impacto: no hay forma de saber si un cliente cambió o está inactivo.
-
-### AUD-2026-D03 — `clientes.cedula` sin CHECK de formato
-- Evidencia: semilla con formatos `'3192873'`, `'V-12345678'`, `'E-87654321'`.
-
-### AUD-2026-D06 — `pagos` no valida cliente/servicio vs factura
-- Evidencia: `api_pagos.php` POST permite pagar factura de cliente B con id_cliente A.
-- Línea roja: sí (facturación).
-
-### AUD-2026-D07 — CHECK `json_valid` no forzado
-- Evidencia: MariaDB 10.4 ignora CHECK. Validación real ausente.
-- Archivos: `bd_redytelca.sql` (`logs.old_value`, `new_value`).
-
-### AUD-2026-D08 — `sesiones` sin CHECK "exactamente uno"
-- Evidencia: `id_usuario` e `id_credencial` ambos nullable sin restricción mutua.
-
-### AUD-2026-D09 — Tablas muertas
-- Evidencia: `usuario_rol`, `rol_modulo_permiso`, `permisos`, `sesion_rol_activo`, `clientes_credenciales`, `notificaciones`, `ticket_respuestas`, `rol_modulo`.
-- Impacto: 8 tablas sin endpoints que las usen.
-
-### AUD-2026-D10 — `equipos.id_servicio` UNIQUE
-- Impacto: impide tener ONT + Router en el mismo servicio.
-
-### AUD-2026-D11 — Falta UNIQUE `facturas(id_servicio, periodo)`
-- Línea roja: sí (facturación).
-
-### AUD-2026-D15 — Índices faltantes
-- Evidencia: `facturas(estado, fecha_vencimiento)`, `pagos(estado)`, `pagos(id_factura, estado)`, `logs(creado_en)`, `sesiones(expira_en)` sin índice.
-
-### AUD-2026-D16 — `configuracion_empresa` no garantiza singleton
-- Evidencia: asume que la app siempre usa `id_config=1`.
-
-### Frontend
-
-### AUD-2026-F03 — `onclick` construido con datos de BD
-- Evidencia: `app.js` en `renderUsersPage`, `renderRoleList`, `renderTasksPage`, `renderTicketsPage`.
-- Impacto: `&#39;` se decodifica a `'` antes de que JS lo lea. Frágil.
-
-### AUD-2026-F04 — `window.permissionContext.token` expuesto
-- Evidencia: `app.js` → `login()`.
-- Impacto: cualquier script del mismo origen lo lee.
-
-### AUD-2026-F05 — Polling 5s/15s por pestaña
-- Evidencia: `setInterval(loadClientes, 5000)`, `setInterval(restoreSession, 15000)`.
-- Impacto: con 10 pestañas = 50 conexiones cada 5s.
-
-### AUD-2026-F06 — `renderMenu()` re-ejecutado cada 15s
-- Evidencia: `restoreSession(false)` redibuja el sidebar.
-- Impacto: flicker visual.
-
-### AUD-2026-F07 — Charts destruidos y recreados
-- Evidencia: `updateDashboardData()` invocado desde múltiples loaders.
-
-### Seguridad
-
-### AUD-2026-S02 — `Logos/convert_logo.php` accesible
-- Evidencia: script PHP en webroot, ejecutable sin auth.
-
-### AUD-2026-S03 — SVG permitido en upload de logo
-- Evidencia: `api_empresa.php` acepta `image/svg+xml`.
-- Impacto: XSS si el SVG se sirve directo.
-
-### AUD-2026-S04 — Sin rate limiting por IP en login
-- Evidencia: solo lockout por cuenta. Distributed password spraying no mitigado.
-
-### Contexto ISP
-
-### AUD-2026-ISP04 — Sin idempotencia en facturación
-- Evidencia: no hay token de idempotencia en `pagos`.
-- Línea roja: sí (facturación).
-
-### AUD-2026-ISP05 — Sin integración real con hardware
-- Evidencia: no hay SNMP, TR-069, SSH a OLTs/routers.
-
-### AUD-2026-ISP06 — Sin timeouts en integraciones externas
-- Evidencia: `api_*.php` sin `PDO::ATTR_TIMEOUT` ni timeouts HTTP.
-
-### No funcionales
-
-### AUD-2026-NF01 — Sin caché de sesiones
-- Evidencia: cada request hace `SELECT FROM sesiones JOIN usuarios`.
-
-### AUD-2026-NF02 — Sin paginación server-side en 10 endpoints
-- Archivos: `api_tareas.php`, `api_tickets.php`, `api_equipos.php`, `api_nodos.php`, `api_olts.php`, `api_naps.php`, `api_planes.php`, `api_contratos.php`, `api_facturas.php`, `api_pagos.php`.
-- Impacto: frontend pagina client-side sobre lista completa.
-
-### AUD-2026-NF04 — Polling agresivo escala O(pestañas × usuarios)
-- Ver F05.
-
-### AUD-2026-NF05 — `app.js` sin minificación
-- Impacto: 2500+ líneas parseadas por carga.
-
-### AUD-2026-NF06 — `styles.css` sin minificación
-
-### AUD-2026-NF07 — Sin Cache-Control en respuestas
-
-### AUD-2026-NF08 — Índices faltantes (duplicado con D15 en código)
+**Score capa 1: 78/100.** Conformidad estructural fuerte. Falta cerrar D02, D03, D07, D08, D13.
 
 ---
 
-## HALLAZGOS MEDIOS (24)
+# CAPA 2 — Backend / API / Lógica de Negocio
 
-### AUD-2026-D04 — `usuarios.estado` en mayúsculas
-- Evidencia: 'Activo' vs resto en minúsculas.
+**Estándares:** 12-Factor App, REST Richardson Maturity, RFC 7231, Clean Architecture, SOLID.
 
-### AUD-2026-D05 — `tareas.estado` y `tickets.estado` VARCHAR(30)
-- Impacto: valores arbitrarios permitidos.
+## 2.1 Pasada 1 — Conformidad estructural (REST)
 
-### AUD-2026-D12 — `pagos.fecha_validacion` no se limpia al revertir
+| Endpoint | Verbo GET | POST | PUT | DELETE | Veredicto |
+|---|---|---|---|---|---|
+| `api_facturas.php` | ❌ **Side-effect** (`UPDATE facturas SET estado='vencida'`) | ✅ | ✅ | ✅ | **No conforme RFC 7231** (B08) |
+| `api_contratos.php` | ❌ **Side-effect** (`UPDATE contratos SET estado='vencido'`) | ✅ | ✅ | ✅ | **No conforme RFC 7231** (B08) |
+| `api_pagos.php` | ✅ | ✅ | ✅ | ✅ | Conforme |
+| `api_servicios.php` | ✅ | ✅ | ✅ | ✅ | Conforme |
+| `api_empresa.php` | ⚠️ GET público (B09) | ✅ | — | — | Aceptable con reserva |
+| `api_nodos/olts/naps/equipos/planes/tickets/tareas` | ✅ | ✅ | ✅ | ✅ | Conforme |
 
-### AUD-2026-D13 — Tablas sin `creado_en`/`actualizado_en`
-- Archivos: `pagos`, `contratos`, `naps`, `nodos`, `olts`, `equipos`.
+**Veredicto capa 2 estructural: 80% conforme.** Los 2 GET con side-effect son violación MUST.
 
-### AUD-2026-D14 — Charset `utf8mb4_general_ci`
-- Impacto: ordenamiento de tildes/ñ incorrecto.
+## 2.2 Pasada 2 — Consistencia interna
 
-### AUD-2026-B20 — Inconsistencia lectura `id` en DELETE
-- Evidencia: `$_GET['id']` vs body.
+| ID | Severidad | Hallazgo |
+|---|---|---|
+| B06 | Alto | PUT/DELETE sobre IDs inexistentes devuelve `success` (varios) |
+| B10 | Alto | Fuga de `$e->getMessage()` en 7 endpoints |
+| B11 | Alto | `api_equipos.php` distingue UNIQUE por `str_contains($e->getMessage(), 'direccion_mac')` |
+| B12 | Alto | `api_facturas.php` POST no captura duplicado `(id_servicio, periodo)` |
+| B13 | Alto | `registrar_cliente.php` con `id_plan=1` hardcoded |
+| B14 | Parcial | Contraseña ≥ 8 chars (NIST pide ≥ 15) |
+| B15 | Alto | Contraseña temporal `'Redytelca123!'` hardcoded |
+| B16 | Alto | `cliente_eliminar.php` no anticipa FK `contratos.id_servicio` |
+| B17 | Medio | `permisos_listar.php` sin gate admin |
+| B18 | Medio | `permisos_guardar.php` sin safeguard del rol 1 |
+| B19 | Medio | `api_pagos.php` DELETE permite borrar `'rechazado'` |
+| B20 | Medio | Inconsistencia de patrón: algunos DELETE leen `$_GET['id']`, otros body |
+| B24 | Medio | `api_tickets`/`api_tareas` sin whitelist de ENUMs |
 
-### AUD-2026-B21 — `logout.php` no usa `revocado_en` ni `motivo_cierre`
-- Impacto: auditoría de cierres de sesión inoperante.
+## 2.3 Pasada 3 — Cross-layer
 
-### AUD-2026-B22 — Timing attack en login
-- Evidencia: rama de fallo actualiza `intentos_fallidos` solo si usuario existe.
+- ✅ Middleware `requireOperation` está definido y es usado por los endpoints administrativos.
+- ⚠️ Cobertura despareja de `requireOperation` entre endpoints CRUD (algunos solo tienen `requirePageAccess`).
 
-### AUD-2026-F08 — Sin manejo global de 401
-- Impacto: cuando expira el token, fetches fallan silenciosamente.
+## 2.4 Pasada 4 — Adversarial (STRIDE)
 
-### AUD-2026-F09 — `alert()` y `confirm()` nativos
-- Evidencia: >30 ubicaciones en `app.js`.
+| Amenaza | Ejemplo | Diagnóstico |
+|---|---|---|
+| **S**poofing | Login con usuario Bloqueado | ✅ Bloqueado |
+| **T**ampering | `PUT api_pagos` para revertir validado | ✅ Bloqueado |
+| **R**epudiation | Auditoría de escrituras | ✅ Cubierto por `setAuditContext()` |
+| **I**nformation Disclosure | `$e->getMessage()` en 7 endpoints | ❌ Abierto |
+| **D**oS | GET api_facturas en bucle → UPDATE global | ❌ Abierto |
+| **E**levation of Privilege | PUT api_pagos → `id_rol !== 1` revertir | ✅ Bloqueado |
 
-### AUD-2026-F10 — `app.js` monolítico de ~2500 líneas
-- Impacto: mantenibilidad comprometida.
+## 2.5 Pasada 5 — No funcional
 
-### AUD-2026-AR01 — Sin separación de capas
-- Evidencia: `sincronizarEstadoServicio()` en `api_contratos.php`, `reconciliarFactura()` en `api_pagos.php`.
+- ❌ **Sin capa de servicios**. Lógica de negocio dispersa en controladores: `reconciliarFactura()` en `api_pagos.php`, `sincronizarEstadoServicio()` en `api_contratos.php`. Si una regla cambia, hay que tocar el controlador.
+- ❌ Sin timeouts explícitos en PDO.
+- ❌ Sin circuit breaker para servicios externos (aunque no hay externos hoy).
 
-### AUD-2026-AR02 — `conexion.php` mezcla 5 responsabilidades
-- CORS + PDO + hashing + auth staff + auth cliente + autorización por página.
+## 2.6 Comparación con SaaS Gestión
 
-### AUD-2026-AR03 — `app.js` mezcla estado/vista/negocio
+| Concepto | REDYTELCA | SaaS Gestión |
+|---|---|---|
+| Capa de servicios | ❌ Inexistente | ✅ Implícita |
+| Idempotencia en pagos | ❌ Ausente | ✅ Presente |
+| Rate limiting login | ❌ Ausente | ✅ Presente |
+| Logging estructurado | ⚠️ Solo tabla `logs` | ✅ OpenTelemetry o equivalente |
 
-### AUD-2026-T03 — Sin linting
-- Evidencia: ni ESLint, ni PHPStan, ni PHP_CodeSniffer.
-
-### AUD-2026-I03 — Sin HTTPS enforcement
-- Evidencia: `conexion.php` no verifica `$_SERVER['HTTPS']`.
-
-### AUD-2026-I04 — Sin health check
-
-### AUD-2026-DOC01 — Documentación aspiracional
-- Evidencia: `DOCUMENTACION.md`, `README.md`, `IMPROVEMENTS.md` describen JWT/refresh/2FA que no existen.
-
-### AUD-2026-ISP08 — Sin plan de migración de datos vivos
-
-### AUD-2026-ISP09 — `origen='portal_cliente'` inalcanzable
-- Evidencia: `portal_cliente.php` es stub.
-
-### AUD-2026-ISP10 — `notificaciones` no usada
-
-### AUD-2026-S05 — Duración de sesión 30 días
-- Viola: NIST SP 800-63B recomienda reautenticación periódica.
-
-### AUD-2026-S06 — Sin cabeceras de seguridad
-- Falta CSP, HSTS, X-Frame-Options, X-Content-Type-Options.
-
-### AUD-2026-X01 — RBAC schema vs runtime mismatch
-- Consistencia cruzada: BD declara N:M, código usa 1:N.
-
-### AUD-2026-X02 — `must_change_password` enforce en 1 de 4 capas
-
-### AUD-2026-X03 — `usuarios.estado` decorativa en todas las capas
-
-### AUD-2026-X04 — `equipos` sin flujo end-to-end
-
-### AUD-2026-X05 — `transicion_estado` cubre UPDATE, no INSERT
+**Score capa 2: 72/100.** Backend funciona pero le faltan los cierres B06–B24.
 
 ---
 
-## HALLAZGOS BAJOS (8)
+# CAPA 3 — Frontend
 
-### AUD-2026-F11 — `window.selectedIds` sin limpieza
+**Estándares:** WCAG 2.1/2.2 AA, Core Web Vitals, HTML Living Standard, ECMAScript, CSP (W3C), Atomic Design, Flux/unidirectional.
 
-### AUD-2026-F12 — Sin CSP/X-Content-Type-Options/X-Frame-Options/HSTS
+## 3.1 Pasada 1 — Conformidad estructural
 
-### AUD-2026-S07 — Credenciales hardcodeadas en `conexion.php`
-- `user='root', pass=''`.
+❌ **NO CONFORME.** Comparado con SaaS Gestión y SmartOLT:
 
-### AUD-2026-S08 — `PDO::ATTR_EMULATE_PREPARES` no seteado a `false`
+| Dimensión | REDYTELCA | SaaS Gestión/SmartOLT |
+|---|---|---|
+| **Jerarquía visual** | Lista plana de páginas en sidebar | Agrupación CRM/OSS/BSS + secciones colapsables |
+| **KPI en dashboard** | 9 tarjetas estáticas + 6 gráficos sin contexto | 4-5 KPIs con tendencia + accionabilidad |
+| **Tablas** | Simple, `<table>` con 5-6 columnas | Densa, con ID de negocio, badges, acciones contextuales |
+| **Estado del sistema** | Sin indicador global | Badge "Sistema OK" en header |
+| **Breadcrumbs** | ❌ No | ✅ Sí |
+| **Vista de detalle** | Modal plano | Pestañas (SmartOLT: 6 tabs para una ONU) |
+| **Búsqueda global** | ❌ No (solo por módulo) | ✅ En header |
+| **Notificaciones** | ❌ No (aunque `notificaciones` está en BD) | ✅ Campana con contador |
+| **Avatar usuario** | ✅ Básico | ✅ Con menú |
+| **Tema oscuro/claro** | ❌ No | ✅ En SmartOLT |
+| **Responsive** | ⚠️ Media queries básicas | ✅ Fluido |
 
-### AUD-2026-AR04 — `router.php` dead code
-- Sin `.htaccess` que lo invoque.
+## 3.2 Pasada 2 — Consistencia interna
 
-### AUD-2026-I01 — Sin backups visibles ni política de retención
+| Hallazgo | Severidad | Evidencia |
+|---|---|---|
+| `alert()`/`confirm()` nativos en >30 lugares | Medio | F09 |
+| Dashboard/Reportes redundantes | Medio | Dos vistas con datos solapados |
+| Sin indicador de carga (`loading state`) | Medio | UX pobre en latencias |
+| Sin paginación server-side | Medio | NF02 |
+| Charts se destruyen y recrean en cada update | Medio | F07 |
+| `filterBySearch` sin normalizar acentos | Bajo | F13 |
+| Sin manejo global de 401/403 | Medio | F08 |
+| `window.selectedIds` sin limpieza | Bajo | F11 |
+| `onclick` inline con datos de BD | Medio | F03 |
+| Token en localStorage | Alto | F01 |
+| Sin CSP | Medio | F12 |
+| Sin `<meta name="robots" content="noindex">` en admin | Bajo | — |
+| Sin `favicon.ico` | Bajo | — |
 
-### AUD-2026-I02 — Sin observabilidad (logs estructurados, métricas, trazas)
+## 3.3 Pasada 3 — Cross-layer
 
-### AUD-2026-T01 — Cero tests automatizados
+- ✅ Frontend sin hardcodeo de rol admin para render del menú.
+- ❌ F14: `nombre_empresa` no se refleja en la UI.
+- ⚠️ `must_change_password` bloquea modal, pero backend ya lo enforca.
+- ⚠️ Los endpoints `api_*` están todos bajo una sola SPA sin code splitting → un fallo en cualquier módulo bloquea la carga inicial (`initApp()` secuencial con 14 `await`).
 
-### AUD-2026-T02 — Sin CI/CD
+## 3.4 Pasada 4 — Adversarial
 
-### AUD-2026-DOC02 — Sin ADRs
+| Amenaza | Estado |
+|---|---|
+| XSS vía `innerHTML` con `escapeHtml` | ⚠️ Mitigado, no eliminado (F03) |
+| Token robado vía XSS | ❌ F01 abierto |
+| Clickjacking | ❌ Sin `X-Frame-Options` |
+| CSRF | ✅ No aplica (tokens en header + CORS whitelist) |
 
-### AUD-2026-D01 (dup) — ver Críticos D01
+## 3.5 Pasada 5 — No funcional
+
+- ❌ Sin Lighthouse report.
+- ❌ Sin accesibilidad WCAG (sin `aria-*`, sin focus visible, sin contraste validado).
+- ❌ Sin `loading="lazy"` en imágenes.
+- ❌ Sin CDN cache control en `styles.css`/`app.js`.
+
+## 3.6 Comparación con SaaS Gestión
+
+| Elemento | REDYTELCA | SaaS Gestión |
+|---|---|---|
+| Sidebar agrupado | ❌ Plano | ✅ CRM/OSS/BSS |
+| Breadcrumbs | ❌ | ✅ |
+| Badge sistema | ❌ | ✅ |
+| Búsqueda global | ❌ | ✅ |
+| Notificaciones (campana) | ❌ | ✅ |
+| Vista 360° cliente | ❌ | ✅ |
+| Módulo "Instalaciones" para técnicos | ❌ | ✅ |
+| KPI dashboard accionable | ❌ Estático | ✅ Con tendencia + drill-down |
+| Reportes con periodo | ❌ Redundante | ✅ Análisis por rango |
+| Filtros avanzados en tablas | ❌ | ✅ |
+| Acciones contextuales (`...`) | ❌ Botones en toolbar | ✅ |
+| Toast notifications | ❌ `alert()` | ✅ |
+
+**Score capa 3: 38/100.** Es la capa más débil. El 90% del rediseño visual está aquí.
 
 ---
 
-## ROADMAP DE CORRECCIÓN
+# CAPA 4 — Seguridad
 
-Los hallazgos se atacan vía specs SDD, en orden de severidad.
+**Estándares:** OWASP ASVS 5.0, OWASP Top 10, CWE, STRIDE, NIST SP 800-63B Rev. 4, ISO/IEC 27011:2024.
 
-- Spec 001: AUD-2026-B03 (auditoría inoperante) — en curso
-- Spec 002: limpiar documentación obsoleta
-- Spec 003+: los 7 críticos restantes (001, 002, B01, B02, B04, B05, S01, F01/F02)
-- Spec 00X+: los 40 altos
-- Spec 00X+: los 24 medios
-- Spec 00X+: los 8 bajos
+## 4.1 Conformidad NIST SP 800-63B
 
-Cada spec referencia su hallazgo origen en `spec.md`. Cada cierre se marca en `docs/ROADMAP.md`.
+| Requisito | REDYTELCA | Cumple |
+|---|---|---|
+| Longitud mínima 15 chars (single factor) | 8 | ❌ |
+| Máximo ≥ 64 chars | Sin límite superior | ✅ |
+| Sin reglas de composición arbitrarias | Sin reglas | ✅ |
+| Verificación contra listas de comprometidas | ❌ | ❌ |
+| Sin rotación forzosa arbitraria | No rota | ✅ |
+| Rate limiting | 5 intentos por cuenta | ⚠️ Parcial (sin IP) |
+
+## 4.2 OWASP Top 10 (2021)
+
+| Riesgo | Diagnóstico |
+|---|---|
+| A01 Broken Access Control | ⚠️ Cobertura despareja de `requireOperation` en endpoints CRUD |
+| A02 Cryptographic Failures | ⚠️ bcrypt ✅, pero HTTP sin HTTPS |
+| A03 Injection | ✅ Prepared statements |
+| A04 Insecure Design | ⚠️ Sin threat model formal |
+| A05 Security Misconfiguration | ❌ Credenciales hardcoded, sin headers |
+| A06 Vulnerable Components | ❌ Sin SBOM |
+| A07 Auth & Session Failures | ⚠️ 30 días, sin reautenticación |
+| A08 Software & Data Integrity | ⚠️ Sin CI/CD, sin SRI en CDN |
+| A09 Logging & Monitoring | ✅ Logs inmutables + `setAuditContext` |
+| A10 SSRF | ✅ N/A (sin fetching externo) |
+
+## 4.3 Líneas rojas ISP
+
+| Línea roja | Diagnóstico |
+|---|---|
+| PII de clientes | ⚠️ Dump fuera webroot ✅, HTTPS pendiente ❌ |
+| Aislamiento de clientes (BOLA/IDOR) | ⚠️ Portal cliente sin implementar |
+| RBAC formal y SoD | ✅ Conforme |
+| Integridad de facturación | ⚠️ Hallazgos abiertos en validación de pagos (D06) |
+| Credenciales de red | N/A (sin credenciales de red) |
+| Disponibilidad mínima | ❌ Sin timeouts, sin health check |
+
+**Score capa 4: 68/100.**
 
 ---
 
-## NOTAS DE ALCANCE
+# CAPA 5 — Arquitectura
 
-- Este informe es estático. La Pasada 6 (dinámica) no se ejecutó.
-- Los hallazgos se clasificaron por severidad técnica y por dominio ISP.
-- Línea roja = no admite excepción sin aprobación formal.
-- Independencia del auditor: reducida (autor = auditor). Ver §12.3 del marco.
+**Estándares:** SOLID, GRASP, Clean/Hexagonal, GoF.
+
+## 5.1 Diagnóstico
+
+| Principio | Estado | Evidencia |
+|---|---|---|
+| Single Responsibility | ❌ | `conexion.php` mezcla CORS, PDO, hashing, auth, autorización, contexto |
+| Open/Closed | ⚠️ | Endpoints no extensibles sin tocar |
+| Liskov | N/A | Sin herencia |
+| Interface Segregation | N/A | Sin interfaces |
+| Dependency Inversion | ❌ | Todo depende de `$pdo` global |
+| Cohesión alta | ❌ | `app.js` mezcla estado, vista, lógica |
+| Acoplamiento bajo | ⚠️ | Endpoints independientes entre sí, pero sin capa de servicios común |
+
+## 5.2 Clean Architecture
+
+- ❌ **No hay separación por capas.** No existe:
+  - `domain/` (entidades y reglas de negocio)
+  - `application/` (casos de uso)
+  - `infrastructure/` (PDO, HTTP)
+- Los endpoints PHP son **Transaction Script** disfrazado de REST.
+
+**Score capa 5: 62/100.**
+
+---
+
+# CAPA 6 — Testing
+
+**Estándares:** ISO/IEC/IEEE 29119, pirámide de pruebas, TDD, Mutation Testing.
+
+## 6.1 Cobertura
+
+- ✅ `tests/run.php` ejecutable.
+- ✅ 4 smoke + 5 auditoría.
+- ❌ 0 tests de endpoints (`api_pagos`, `api_facturas`, `login`, etc.).
+- ❌ 0 tests de integración con BD.
+- ❌ 0 tests de frontend.
+- ❌ Sin tests negativos.
+- ❌ Sin mutation testing.
+- ❌ Sin CI/CD.
+
+**Score capa 6: 40/100.**
+
+---
+
+# CAPA 7 — Infraestructura
+
+**Estándares:** 12-Factor, CI/CD, Google SRE, OpenTelemetry.
+
+- ❌ Sin variables de entorno (credenciales hardcoded).
+- ❌ Sin CI/CD.
+- ❌ Sin backups automatizados.
+- ❌ Sin observabilidad (métricas, trazas).
+- ❌ Sin health check.
+- ❌ Sin HTTPS enforcement en código.
+- ⚠️ `.htaccess` con 403 para `.sql` ✅.
+
+**Score capa 7: 45/100.**
+
+---
+
+# CAPA 8 — Documentación
+
+**Estándares:** ISO/IEC 26514, ISO/IEC 25010 (Mantenibilidad).
+
+- ✅ `docs/constitution.md`
+- ✅ `docs/ARQUITECTURA.md`
+- ✅ `docs/BD.md`
+- ✅ `docs/AUDITORIA_2026.md`
+- ✅ `docs/ROADMAP.md`
+- ✅ `docs/METODOLOGIA_*.md`
+- ✅ ADRs 001–008
+- ❌ Falta diagrama ER actualizado
+- ❌ Falta diagrama de secuencia de login
+- ❌ Falta diagrama C4 del sistema
+
+**Score capa 8: 82/100.**
+
+---
+
+# CAPA 9 — Calidad de Producto (ISO/IEC 25010:2023)
+
+| Característica | Score | Comentario |
+|---|---|---|
+| Adecuación funcional | 88 | Núcleo funcional completo |
+| Eficiencia de desempeño | 55 | UPDATE en GET, sin caché |
+| Compatibilidad | 70 | UTF-8, navegadores modernos |
+| Capacidad de interacción | **35** | **UI básica, `alert()` nativos** |
+| Fiabilidad | 65 | Transacciones ✅, sin tests ❌ |
+| Seguridad | 68 | Mucho cerrado, headers pendientes |
+| Mantenibilidad | 55 | app.js monolítico |
+| Flexibilidad | 60 | Esquema rico, código rígido |
+| Seguridad física | N/A | No aplica |
+
+**Score capa 9: 62/100.**
+
+---
+
+# CAPA 10 — Contexto Operativo ISP
+
+**Estándares:** TM Forum SID/eTOM, ISO/IEC 27011:2024, ITU-T X.1051.
+
+## 10.1 Cobertura de procesos eTOM
+
+| Proceso | REDYTELCA | Observación |
+|---|---|---|
+| **CRM** (Customer Relationship Mgmt) | ⚠️ Parcial | `clientes` sí, pero sin interacciones ni historial 360° |
+| **Fulfillment** (Order Management) | ❌ | Sin entidad `Pedido`. `tareas` no es un flujo de aprovisionamiento |
+| **Assurance** (Fault, Performance) | ⚠️ Parcial | `tickets` existe, `instalaciones` no |
+| **Billing** (Invoice, Payment) | ✅ | `facturas`, `pagos`, `factura_lineas` |
+| **Resource Management** | ⚠️ Parcial | `nodos`, `olts`, `naps`, `equipos`, `ip_pools` |
+
+## 10.2 Comparación con SmartOLT/SaaS
+
+| Feature esperado en un ISP | REDYTELCA | Justificación de ausencia |
+|---|---|---|
+| Provisioning automático de ONU | ❌ | Fuera de alcance (integración HW) |
+| Alarmas de OLT/ONU | ❌ | Fuera de alcance |
+| Rate-limiting de ancho de banda | ❌ | Fuera de alcance |
+| Consumo de tráfico por cliente | ❌ | Fuera de alcance |
+| Mapa de red con cobertura | ✅ | Módulo `mapa` |
+| IPAM | ✅ | `ip_pools`, `ip_asignaciones` |
+| Facturación + cobro | ✅ | Módulo `facturas`, `pagos` |
+| Portal de cliente | ⚠️ | Stub |
+| App móvil técnico | ❌ | Fuera de alcance |
+| CRM con historial 360° | ❌ | Pendiente |
+
+**Score capa 10: 70/100.**
+
+---
+
+# Matriz consolidada de hallazgos nuevos detectados
+
+| ID | Capa | Sev | Hallazgo |
+|---|---|---|---|
+| D18 | 1 | Medio | Falta `bd_redytelca_schema.sql` versionable (solo DDL) |
+| D19 | 1 | Bajo | Índices menores ausentes: `logs(accion, creado_en)` |
+| B25 | 2 | Medio | Sin capa de servicios (lógica de negocio en controladores) |
+| B26 | 2 | Medio | Timeouts PDO ausentes |
+| B27 | 2 | Bajo | Sin Content-Type validation estricto |
+| F15 | 3 | **Alto** | Ausencia de jerarquía visual / arquitectura de información |
+| F16 | 3 | **Alto** | Tablas con información pobre (sin ID de negocio, badges, acciones) |
+| F17 | 3 | **Alto** | Ausencia de vista 360° del cliente |
+| F18 | 3 | Medio | Sin notificaciones (campana) |
+| F19 | 3 | Medio | Sin breadcrumbs |
+| F20 | 3 | Medio | Sin búsqueda global |
+| F21 | 3 | Medio | Dashboard/Reportes redundantes (sin distinción temporal) |
+| F22 | 3 | Medio | `alert()` / `confirm()` en >30 lugares |
+| F23 | 3 | Bajo | Sin `favicon.ico`, sin `<meta name="robots">` |
+| F24 | 3 | Bajo | Sin dark mode |
+| AR05 | 5 | Medio | `initApp()` secuencial con 14 `await` bloquea carga |
+| T04 | 6 | Alto | Sin tests de endpoints |
+| T05 | 6 | Alto | Sin tests de frontend |
+| I05 | 7 | Medio | Sin `date_default_timezone_set()` |
+| ISP11 | 10 | Medio | Sin entidad `Pedido` (eTOM Fulfillment) |
+| ISP12 | 10 | Medio | Sin historial 360° del cliente |
+| ISP13 | 10 | Bajo | Sin SLA/QoS tracking |
+
+---
+
+## Cierre del documento
+
+Este informe es la fuente canónica de **hallazgos** de auditoría. No contiene planes de ejecución.
+
+- **Plan de correcciones y estado de cada hallazgo:** `docs/ROADMAP.md`.
+- **Esquema:** `bd_redytelca.sql`.
+- **Estado operativo del proyecto:** `MEMORY.md`.
+- **Versión auditada:** dump `local-repo-converted (2).txt` + `bd_redytelca.sql`.
+- **Fecha de corte:** 2026-10-11.
+
+Los 22 hallazgos nuevos detectados están incorporados en las capas correspondientes con su ID formal: D18, D19, B25, B26, B27, F15–F24, AR05, T04, T05, I05, ISP11–13.
+
+---

@@ -1,215 +1,378 @@
 # Roadmap — REDYTELCA
 
-Plan de correcciones derivado de `docs/AUDITORIA_2026.md`. Cada hallazgo se ataca mediante una spec SDD en `specs/NNN-nombre/`.
+Única fuente del estado de specs. **Cada spec aparece una sola vez, con una línea de qué hace.**
+Para actualizar: cambia el estado en su fila. Nada más.
+Auditoría de hallazgos: `AUDITORIA_2026.md`. Estado operativo: `MEMORY.md`.
 
-## Estados posibles
+**Estados:** `⏳ pendiente` · `🔄 en progreso` · `✅ cerrado` · `💤 diferido`.
+`bloqueado` NO es un estado válido.
 
-- **pendiente**: hallazgo sin spec asignada todavía.
-- **en progreso**: spec creada, en alguna fase del flujo SDD.
-- **cerrado**: spec validada, hallazgo resuelto.
-- **diferido**: hallazgo aceptado como deuda técnica consciente, con ADR.
+**Todas las fases se ejecutan en orden secuencial (1 → 7).** El orden importa; la etiqueta "obligatoria" sobra.
 
-## Convenciones
-
-- Cada spec se numera secuencialmente: `NNN-nombre-corto`.
-- Una spec puede cubrir varios hallazgos si están relacionados y comparten archivos.
-- Al cerrar una spec, actualizar estado aquí y en `MEMORY.md`.
+**Huecos de numeración:** 104, 107, 111 nunca existieron como specs. No buscar.
 
 ---
 
-## Bloqueantes de tesis — Línea roja
+## Estado actual
 
-Estos hallazgos comprometen líneas rojas (§5.4 del marco de auditoría) y deben resolverse antes de la defensa.
+- **Fase activa:** 1 — MVC
+- **Siguiente:** 139e (estructura `public/` + `src/`)
+- **Cerradas:** 52 · **En progreso:** 0 · **Pendientes:** ~101 filas (~66 padres)
 
-| ID | Severidad | Descripción corta | Spec | Estado |
-|----|-----------|-------------------|------|--------|
-| AUD-2026-B03 | Crítico | Auditoría de operaciones inoperante | 001-fix-auditoria-logs | en progreso |
-| AUD-2026-001 | Crítico | RBAC no conforme a ANSI/INCITS 359 | 003-decision-rbac | pendiente |
-| AUD-2026-002 | Crítico | Sin gate por operación | 003-decision-rbac | pendiente |
-| AUD-2026-B01 | Crítico | `$_SESSION` nativo en login/logout | 004-eliminar-session-nativo | pendiente |
-| AUD-2026-B02 | Crítico | `usuarios.estado` no verificado en login | 005-login-estado-usuario | pendiente |
-| AUD-2026-B04 | Crítico | `must_change_password` solo en cliente | 006-enforce-must-change-password | pendiente |
-| AUD-2026-B05 | Crítico | Revertir pago validado por no-admin | 007-pagos-gate-admin | pendiente |
-| AUD-2026-S01 | Crítico | Dump SQL en webroot | 008-mover-dump-fuera-webroot | pendiente |
-| AUD-2026-F01 | Crítico | Token en localStorage | 009-token-fuera-localstorage | pendiente |
-| AUD-2026-F02 | Crítico | Token en query string | 009-token-fuera-localstorage | pendiente |
+---
 
-## Correcciones estructurales
+## Fase 1 — MVC
 
-| ID | Severidad | Descripción corta | Spec | Estado |
-|----|-----------|-------------------|------|--------|
-| AUD-2026-DOC01 | Medio | Documentación aspiracional | 002-limpiar-documentacion | pendiente |
-| AUD-2026-D09 | Alto | Tablas muertas (8 tablas sin uso) | 003-decision-rbac (parcial) | pendiente |
+Cierra el Bloque 29. Reactiva 13 endpoints caídos. Al terminar: 20 controllers, 36 thin files, `conexion.php` y `app.js` eliminados, 0 endpoints caídos, estructura `public/` + `src/` (139e).
 
-## Hallazgos Altos por dominio
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 134 | core/ | Kernel MVC: Bootstrap, Config, Database, Response, Validator, Auth, Exceptions, bases. Autoloading PSR-4. | ✅ |
+| 135 | models/ | 35 entidades de dominio (atributos + getters/setters, sin SQL). | ✅ |
+| 136 | repositories/ | 35 repositorios con todo el SQL (PDO). Heredan de `BaseRepository`. | ✅ |
+| 137 | services/ | 18 servicios con lógica de negocio y transacciones. | ✅ |
+| 138 | validators/ | 16 validadores de entrada (validateCreate + validateUpdate). | ✅ |
+| 139 (padre) | MVC controllers | Agrupa 139a–d. Cierra cuando 139d cierre. | ✅ |
+| 139a | controllers auth | Auth, Perfil, Usuario, Cliente + 14 thin endpoints. | ✅ |
+| 139b | controllers finanzas | Servicio, Contrato, Plan, Factura, Pago, MetodoPago + 8 thin. | ✅ |
+| 139c | controllers infra/soporte | Nodo, Olt, Nap, Equipo, Ticket, Tarea, Pedido + 7 thin (6 reescritos + `api_pedidos` nuevo). Migración `2026-10-18-139c-pedidos-rbac.sql`. | ✅ |
+| 139e | estructura despliegue | Mover `core/`, `controllers/`, `services/`, `repositories/`, `models/`, `validators/`, `tests/` a `src/`. Mover thin files + `index.html` + `app.js` + `styles.css` + `Logos/` + `uploads/` a `public/`. Actualizar `require`, `Bootstrap.php`, `router.php`, `.htaccess` fallback. Cierra la exposición del código fuente al webroot. ADR 018. | ⏳ |
+| 140 | frontend js/ | Reescribir `app.js` en `js/core|models|views|controllers/`. Adaptar `index.html`. Borrar `app.js`. | ⏳ |
 
-### Backend
+**Reglas heredadas de 139b:**
+- `unset($input['id_X'])` en cada `update()` (causa de BUG-6.3/BUG-6.4).
+- Tests de DELETE solo con dummies creados en el turno, nunca con seed.
+- Verificar cada endpoint contra el esquema post-B28 antes de fusionar.
 
-| ID | Descripción | Spec | Estado |
-|----|-------------|------|--------|
-| AUD-2026-B06 | PUT devuelve success con 0 filas | 010-put-idempotencia | pendiente |
-| AUD-2026-B07 | INSERT bypassa transiciones | 011-validar-insert-transiciones | pendiente |
-| AUD-2026-B08 | UPDATE global en GET | 012-sacar-update-de-get | pendiente |
-| AUD-2026-B09 | `api_empresa.php` GET público | 013-proteger-api-empresa | pendiente |
-| AUD-2026-B10 | Errores con fuga de información | 014-silenciar-errores-sql | pendiente |
-| AUD-2026-B11 | UNIQUE detectado con `str_contains` | 015-errores-unique-por-errorinfo | pendiente |
-| AUD-2026-B12 | Facturas duplicadas por periodo | 016-unique-factura-servicio-periodo | pendiente |
-| AUD-2026-B13 | `id_plan` hardcodeado en registro | 017-quitar-id-plan-hardcoded | pendiente |
-| AUD-2026-B14 | Sin validación de fortaleza de password | 018-fortaleza-passwords | pendiente |
-| AUD-2026-B15 | Password temporal predecible | 018-fortaleza-passwords | pendiente |
-| AUD-2026-B16 | FK contratos no anticipada | 019-eliminar-cliente-con-contratos | pendiente |
-| AUD-2026-B17 | `permisos_listar.php` sin admin | 020-permisos-gate-admin | pendiente |
-| AUD-2026-B18 | `permisos_guardar.php` sin confirmación | 020-permisos-gate-admin | pendiente |
-| AUD-2026-B19 | DELETE de pagos rechazados | 021-preservar-trazabilidad-pagos | pendiente |
+**Reglas heredadas de 139c:**
+- Migración SQL primero, verificar con triggers antes de escribir controllers.
+- Los 5 deletes bloqueados por dependencias se testean contra el seed sin borrarlos.
 
-### Base de datos
+**Reglas heredadas de 139d Tanda C:**
+- Verificar que los archivos de AI Studio conservan todos los métodos del dump. En Tanda C, AI Studio borró `findModulosPermitidosByRoles`, revirtió `guardarMatriz` a SQL inline, cambió `insertIgnore` a array. Rechazado.
+- Tests de escritura RBAC con rol dummy (`test_139d_rol_perm`), nunca con seed. Cascada limpia `rol_modulo*`.
+- Body JSON en CLI de Windows viaja por base64.
 
-| ID | Descripción | Spec | Estado |
-|----|-------------|------|--------|
-| AUD-2026-D01 | `facturas.impuesto_aplicado` sin uso | 022-limpiar-columnas-muertas | pendiente |
-| AUD-2026-D02 | `clientes` sin `actualizado_en`/`estado` | 023-timestamps-clientes | pendiente |
-| AUD-2026-D03 | `cedula` sin CHECK de formato | 024-validar-cedula | pendiente |
-| AUD-2026-D06 | Pagos cruzados entre clientes | 025-validar-pago-pertenencia | pendiente |
-| AUD-2026-D07 | CHECK `json_valid` no forzado | 026-validar-json-logs | pendiente |
-| AUD-2026-D08 | `sesiones` sin CHECK exclusividad | 027-check-sesion-exclusiva | pendiente |
-| AUD-2026-D10 | `equipos.id_servicio` UNIQUE | 028-permitir-multiples-equipos | pendiente |
-| AUD-2026-D11 | Falta UNIQUE facturas | 016-unique-factura-servicio-periodo | pendiente |
-| AUD-2026-D15 | Índices faltantes | 029-indices-faltantes | pendiente |
-| AUD-2026-D16 | Singleton sin garantía de esquema | 030-configuracion-singleton | pendiente |
+**Reglas heredadas de 139e (aprobada 2026-10-18):**
+- Se ejecuta entre 139d y 140, con ADR 018.
+- `git tag pre-139e` + backup BD antes de mover archivos.
+- Criterio de cierre: `grep -r "conexion.php"` → 0, `core/Config.php` por URL → 403/404, E2E login + api_* + branding + portal → 200.
 
-### Frontend
+---
 
-| ID | Descripción | Spec | Estado |
-|----|-------------|------|--------|
-| AUD-2026-F03 | `onclick` con datos de BD | 031-sacar-onclick-inline | pendiente |
-| AUD-2026-F04 | `window.permissionContext.token` expuesto | 009-token-fuera-localstorage | pendiente |
-| AUD-2026-F05 | Polling 5s/15s | 032-reducir-polling | pendiente |
-| AUD-2026-F06 | `renderMenu()` re-ejecutado | 032-reducir-polling | pendiente |
-| AUD-2026-F07 | Charts destruidos y recreados | 033-optimizar-charts | pendiente |
+## Fase 2 — Deudas heredadas de MVC
+
+| Spec / Deuda | Qué hace | Estado |
+|---|---|---|
+| BUG-6.1 + F08 | Al cambiar permisos, la UI sigue mostrando datos viejos hasta logout+login. Limpiar `window.*Cache` al cambiar rol. | ⏳ |
+| Overlay-F5 | Al recargar con sesión activa, reaparece `#login-overlay`. `restoreSession()` debe ocultarlo. | ⏳ |
+| 139b-1 | 4 `index()` sin JOINs (Servicio, Contrato, Factura, Pago) → frontend los resuelve con APIs cruzadas. | ⏳ |
+| 139b-2 | `ServicioController::update` no persiste `direccion_servicio`. Añadir `actualizarDireccion()`. | ⏳ |
+| 139b-3 | Frontend viejo manda `id_servicio`, backend espera `servicio_id`. Contrato roto. | ⏳ |
+| 139c-1 | 7 `index()` de infra/soporte sin JOINs. Igual que 139b-1. | ⏳ |
+| 139c-2 | Sidebar muestra "Pedidos de campo" sin `showPage('pedidos')`. | ⏳ |
+| 139c-3 | `EquipoController::index` sin filtro devuelve solo stock. | ⏳ |
+| 139c-4 | Operador sin `leer` en tickets/tareas. Seed RBAC incompleto. | ⏳ |
+| 139c-5 | `PedidoService::asignarTecnico` no expuesto. | ⏳ |
+| 139d-1 | `roles_eliminar.php` mantiene POST por compatibilidad. Se unifica con DELETE en 140. | ⏳ |
+| 139d-2 | `EmpresaController::store` sube archivo antes de validar campos; `@unlink` en catch. Re-verificar end-to-end en 140 si la UI cambia. | ⏳ |
+| 139d-3 | 5 métodos con SQL crudo en `AuthService` y `UsuarioService` (`cargarRolesUsuario`, `cargarModulosPermitidos`, `asignarRoles`, `listarRoles`, `contarOtrosAdminsActivos`, `desactivar`). Cierra 136f-bis. | ⏳ |
+| 139d-B-1 | `Auth::jsonError()` sin `JSON_UNESCAPED_UNICODE`; acentos salen como `\u00f1`. | ⏳ |
+| 060 | Limpiar documentación obsoleta de `docs/` (archivar, corregir referencias). | ⏳ |
+| DOC-04 | `ARQUITECTURA.md` y `BD.md` dicen `utf8mb4_general_ci`; la BD es `utf8mb4_unicode_ci`. | ⏳ |
+| DOC-05 | `ARQUITECTURA.md` y `BD.md` no listan las 17 tablas nuevas de BD-COMPLETA. | ⏳ |
+| DOC-08 | ADR 013 dice que `notificaciones_staff` no tendría triggers; P4 sí los creó. | ⏳ |
+| DOC-09 | `bd_redytelca_schema.sql` desactualizado (pre-P14/P15, dice 48 tablas; la BD tiene 44). Regenerar. | ⏳ |
+| EST-02 | `sla_definiciones` solo tiene 3 de 8 combinaciones (falta Instalación y Baja). | ⏳ |
+| EST-03 | `email_plantillas` solo tiene 6 de ~9 eventos (falta ticket_creado, pago_pendiente, pago_rechazado). | ⏳ |
+
+**Nota:** DOC-07, DOC-10, DOC-11, DOC-12 y DOC-13 se **auto-resolvieron al reescribir este archivo el 2026-10-18**. No aparecen como deudas porque el ROADMAP ya no las viola.
+
+---
+
+## Fase 3 — UI/UX bonita
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 078 | Design system | Tokens de diseño, componentes base, guía visual. Requisito de las demás. Absorbe 077. | ⏳ |
+| 079 | Navegación agrupada | Sidebar por secciones (Análisis, Operación, Infraestructura, Finanzas, Configuración) + colapsables. | ⏳ |
+| 080 | Dashboard accionable | KPIs con tendencia y drill-down, reemplaza los 9 estáticos actuales. | ⏳ |
+| 082 | Reportes con periodo | Filtros por rango de fechas, distinto del dashboard. | ⏳ |
+| 083 | Vista 360° cliente | Pestañas (datos, servicios, facturas, tickets, pagos) en una sola pantalla. Absorbe 095. | ⏳ |
+| 085 | Breadcrumbs + búsqueda global | Breadcrumbs de navegación + buscador global en header. | ⏳ |
+
+**Dependencias:** 078 es requisito de 079–085. Todo el bloque depende de 140. Modelo de permisos por página aprobado (Salesforce, ServiceNow, AWS QuickSight, SAP, Azure, Odoo). Vive en `js/controllers/roles.js` con `PERMISOS_POR_PAGINA`.
+
+---
+
+## Fase 4 — Botón Roles + permisos en grilla
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 084 | mejoras-tablas (permisos en grilla) | Reemplazar las cards de permisos por una grilla tabla (filas=páginas, columnas=operaciones). | ⏳ |
+| — | Botón Roles en Usuario | Botón en la ficha de usuario que abre el editor de roles del usuario. | ⏳ |
+| — | Cierra MAP-01, EST-01, UX-01 | Ajustes de UI pendientes: página `mapa` sin endpoint propio, páginas sin CRUD, `<select>` de contrato con opciones inválidas. | ⏳ |
+
+---
+
+## Fase 5 — Portal + Notificaciones
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 096a | Portal: auth | Login de cliente contra `clientes_credenciales`. Sesión `tipo_usuario='cliente'`. `requireClientAuth`. | ⏳ |
+| 096b | Portal: facturas | Ver facturas propias + estado + saldo. `id_cliente` siempre de sesión, nunca del body. | ⏳ |
+| 096c | Portal: pagos | Subir comprobante, registrar pago con `origen='portal_cliente'`. | ⏳ |
+| 096d | Portal: tickets | Abrir ticket, ver historial, responder. | ⏳ |
+| 096e | Portal: servicios | Ver servicios y contratos propios. | ⏳ |
+| 096f | Portal: PDF | Descargar factura en PDF vía `window.print()`. | ⏳ |
+| 086a | Notif: esquema | Servicio transversal `notificar()`. Migración de `notificaciones` + `notificaciones_staff`. | ⏳ |
+| 086b | Notif: eventos | Disparar notificación desde tickets, pagos, facturas, tareas. | ⏳ |
+| 086c | Notif: UI staff | Campana en header del admin con badge y dropdown. | ⏳ |
+| 086d | Notif: UI cliente | Campana en portal del cliente. | ⏳ |
+| 086e | api-tickets-autoria-cliente | Conectar tickets del portal con el panel admin. | ⏳ |
+| 086f | api-tareas-derivadas | Tareas creadas desde tickets del cliente. | ⏳ |
+| 086g | api-pagos-origen-portal | Pagos del portal visibles en admin. | ⏳ |
+| 086h | api-facturas-notificar-emision | Notificar al cliente cuando se emite una factura. | ⏳ |
+
+**Fundamento:** Splynx, Sonar, SmartOLT, ISPsystem. ADRs 010 y 011.
+
+---
+
+## Fase 6 — Título del proyecto
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| — | Título definitivo | Documental. | ⏳ |
+
+---
+
+## Fase 7 — Resto (secuencial)
+
+Continúa el orden después de Fase 6. Sin pre-categorización. Se ejecutan en el orden en que aparecen.
+
+### BD residual
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 006 | limpiar columnas muertas | Eliminar columnas que no se usan (`facturas.impuesto_aplicado`, etc.). Verificar contra dump. | ⏳ |
+| 014 | revertir pago completo | Al revertir un pago validado, la factura debe volver a estado correcto. Verificar contra dump. | ⏳ |
+
+### Backend residual
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 027 | quitar id_plan hardcoded | `registrar_cliente.php` usa `id_plan=1` hardcoded. Parametrizar. | ⏳ |
+| 028 | fortaleza passwords | B14: mínimo ≥8 chars → NIST pide ≥15. B15: password temporal hardcodeada. (parcial: B14 a 8 chars, B15 pendiente) | ⏳ |
+| 029 | eliminar cliente con contratos | `cliente_eliminar.php` no verifica FK de contratos antes del DELETE. | ⏳ |
+| 031 | preservar trazabilidad pagos | DELETE de pagos `rechazado` borra historial. Bloquear o marcar como anulado. | ⏳ |
+| 074 | validar enums tickets/tareas | `api_tickets` y `api_tareas` aceptan cualquier string en estado/prioridad. | ⏳ |
+
+### Frontend residual
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 035 | token fuera localStorage | Mover token a cookie HttpOnly o equivalente. (parcial: F02 resuelto, F01/F04 pendientes) | ⏳ |
+| 036 | sacar onclick inline | Reemplazar `onclick="..."` por addEventListener. | ⏳ |
+| 038 | optimizar charts | Reutilizar instancias de Chart.js en lugar de destruir y recrear. | ⏳ |
+| 040 | modales propios | Reemplazar `alert()`/`confirm()` por modales custom. | ⏳ |
+| 042 | limpiar selectedIds | `window.selectedIds` no se limpia al cambiar de página. | ⏳ |
 
 ### Seguridad
 
-| ID | Descripción | Spec | Estado |
-|----|-------------|------|--------|
-| AUD-2026-S02 | `convert_logo.php` accesible | 034-mover-scripts-fuera-webroot | pendiente |
-| AUD-2026-S03 | SVG permitido en upload | 035-validar-uploads-imagenes | pendiente |
-| AUD-2026-S04 | Sin rate limiting por IP | 036-rate-limiting-login | pendiente |
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 044 | mover scripts fuera webroot | `Logos/convert_logo.php` y otros scripts no deben ser accesibles por URL. | ⏳ |
+| 045 | validar uploads imágenes | Validar MIME de imágenes subidas en `api_empresa.php`. | ⏳ |
+| 046 | rate limiting login | Limitar intentos fallidos por IP además de por cuenta. | ⏳ |
+| 047 | expiración sesión | Renovación deslizante de 30 días → evaluar reducir a 7. | ⏳ |
+| 048 | headers de seguridad | `X-Frame-Options`, `X-Content-Type-Options`, CSP básico. | ⏳ |
+| 049 | config entorno | Mover credenciales BD a `.env`. Fijar timezone UTC. Absorbe 088. | ⏳ |
+
+### Arquitectura y docs
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 052 | eliminar dead code | Eliminar archivos no usados. | ⏳ |
+| 089 | schema SQL versionable | Regenerar `bd_redytelca_schema.sql` con el esquema actual. | ⏳ |
+
+### Testing
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 053 | tests completos | Tests de endpoints + frontend. Absorbe 090 y 091. (parcial: harness con 4 smoke + 5 auditoría; endpoints y frontend pendientes) | ⏳ |
+| 054 | CI/CD | Pipeline de build, test, deploy. Absorbe 092. | ⏳ |
+| 055 | linting | PHP_CodeSniffer + ESLint. | ⏳ |
+
+### Infraestructura
+
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 056 | HTTPS enforcement | Forzar HTTPS en producción. | ⏳ |
+| 057 | health check | Endpoint `/health` con chequeo de BD + servicios. Absorbe parte de 093. | ⏳ |
+| 058 | backups automatizados | Script de backup diario + retención. Absorbe parte de 093. | ⏳ |
+| 059 | observabilidad | Logs estructurados + métricas + trazas. | ⏳ |
 
 ### Contexto ISP
 
-| ID | Descripción | Spec | Estado |
-|----|-------------|------|--------|
-| AUD-2026-ISP04 | Sin idempotencia en facturación | 037-idempotencia-pagos | pendiente |
-| AUD-2026-ISP05 | Sin integración hardware | 038-inventario-hw (parcial) | diferido |
-| AUD-2026-ISP06 | Sin timeouts externos | 039-timeouts-pdo-http | pendiente |
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 062 | idempotencia pagos | Evitar doble validación de un pago con el mismo comprobante. | ⏳ |
+| 063 | timeouts PDO/HTTP | Timeouts explícitos en PDO y llamadas externas. | ⏳ |
+| 064 | plan de migración | Procedimiento documentado para migraciones BD en producción. | ⏳ |
+| 067 | inventario HW | Fuera de alcance (ver ADR 012). | 💤 |
+| 068 | equipos flujo completo | Equipo → NAP → Servicio → Cliente con trazabilidad completa. | ⏳ |
 
-### No funcionales
+### Performance
 
-| ID | Descripción | Spec | Estado |
-|----|-------------|------|--------|
-| AUD-2026-NF01 | Sin caché de sesiones | 040-cache-sesiones | pendiente |
-| AUD-2026-NF02 | Sin paginación server-side | 041-paginacion-server-side | pendiente |
-| AUD-2026-NF04 | Polling O(pestañas × usuarios) | 032-reducir-polling | pendiente |
-| AUD-2026-NF05 | `app.js` sin minificar | 042-minificar-assets | pendiente |
-| AUD-2026-NF06 | `styles.css` sin minificar | 042-minificar-assets | pendiente |
-| AUD-2026-NF07 | Sin Cache-Control | 042-minificar-assets | pendiente |
-| AUD-2026-NF08 | Índices faltantes (dup D15) | 029-indices-faltantes | pendiente |
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 069 | cache sesiones | Cache de sesiones en Redis/Memcached (evaluar si necesario). | ⏳ |
+| 070 | paginación server-side | Paginación en SQL (LIMIT/OFFSET) en lugar de client-side. | ⏳ |
+| 071 | minificar assets | Minificar CSS/JS en build. | ⏳ |
 
----
+### Módulos de negocio
 
-## Hallazgos Medios
-
-| ID | Descripción | Spec | Estado |
-|----|-------------|------|--------|
-| AUD-2026-D04 | `usuarios.estado` en mayúsculas | 043-normalizar-enums | pendiente |
-| AUD-2026-D05 | `tareas.estado`/`tickets.estado` VARCHAR | 043-normalizar-enums | pendiente |
-| AUD-2026-D12 | `pagos.fecha_validacion` no se limpia | 044-revertir-pago-completo | pendiente |
-| AUD-2026-D13 | Tablas sin timestamps | 045-timestamps-faltantes | pendiente |
-| AUD-2026-D14 | Charset `general_ci` | 046-charset-unicode | pendiente |
-| AUD-2026-B20 | Inconsistencia lectura `id` en DELETE | 047-unificar-delete-params | pendiente |
-| AUD-2026-B21 | `logout.php` no usa `revocado_en` | 048-logout-completo | pendiente |
-| AUD-2026-B22 | Timing attack en login | 049-login-timing-constante | pendiente |
-| AUD-2026-F08 | Sin manejo global de 401 | 050-manejo-401-global | pendiente |
-| AUD-2026-F09 | `alert()`/`confirm()` nativos | 051-modales-propios | pendiente |
-| AUD-2026-F10 | `app.js` monolítico | 052-modularizar-app-js | pendiente |
-| AUD-2026-AR01 | Sin separación de capas | 053-capa-servicios | pendiente |
-| AUD-2026-AR02 | `conexion.php` mezcla responsabilidades | 054-separar-conexion | pendiente |
-| AUD-2026-AR03 | `app.js` mezcla estado/vista/lógica | 052-modularizar-app-js | pendiente |
-| AUD-2026-T03 | Sin linting | 055-linting | pendiente |
-| AUD-2026-I03 | Sin HTTPS enforcement | 056-https-enforcement | pendiente |
-| AUD-2026-I04 | Sin health check | 057-health-check | pendiente |
-| AUD-2026-ISP08 | Sin plan de migración de datos | 058-plan-migracion | pendiente |
-| AUD-2026-ISP09 | `portal_cliente` inalcanzable | 059-portal-cliente-real | diferido |
-| AUD-2026-ISP10 | `notificaciones` sin uso | 060-notificaciones | diferido |
-| AUD-2026-S05 | Sesión 30 días | 061-expiracion-sesion | pendiente |
-| AUD-2026-S06 | Sin cabeceras de seguridad | 062-headers-seguridad | pendiente |
-| AUD-2026-X01 | RBAC schema vs runtime mismatch | 003-decision-rbac | pendiente |
-| AUD-2026-X02 | `must_change_password` en 1 de 4 capas | 006-enforce-must-change-password | pendiente |
-| AUD-2026-X03 | `usuarios.estado` decorativa | 005-login-estado-usuario | pendiente |
-| AUD-2026-X04 | `equipos` sin flujo end-to-end | 063-equipos-flujo-completo | pendiente |
-| AUD-2026-X05 | Transiciones en UPDATE, no INSERT | 011-validar-insert-transiciones | pendiente |
+| Spec | Nombre | Qué hace | Estado |
+|---|---|---|---|
+| 098 | SLA/QoS tracking | Fuera de alcance actual (ver ADR 012). | 💤 |
+| 114a | IPAM endpoints | CRUD de pools y asignaciones IP. | ⏳ |
+| 114b | IPAM UI | Interfaz de gestión de IPs. | ⏳ |
+| 114c | IPAM migrar servicios | Mover `servicios.ip_asignada` a `ip_asignaciones`. | ⏳ |
+| 115a | Pedidos CRUD | CRUD de pedidos (instalación, reparación, retiro, traslado). | ⏳ |
+| 115b | Pedidos asignación técnico | Asignar pedido a técnico + estados. | ⏳ |
+| 115c | Pedidos materiales | Materiales usados en cada pedido. | ⏳ |
+| 115d | Pedidos UI | Interfaz de pedidos. Absorbe 081. | ⏳ |
+| 116a | Email SMTP | Configurar envío de correos vía SMTP. | ⏳ |
+| 116b | Email plantillas | CRUD de plantillas de correo. | ⏳ |
+| 116c | Email verificación/reset | Flujos de verificación de email y recuperación de contraseña. | ⏳ |
+| 116d | Email facturas/notif | Notificaciones por email de facturas y otros eventos. | ⏳ |
+| 117a | Autoservicio cambio plan | Cliente puede cambiar de plan desde el portal. | ⏳ |
+| 117b | Autoservicio datos | Cliente puede actualizar sus datos. | ⏳ |
+| 117c | Autoservicio password | Cliente puede cambiar su contraseña. | ⏳ |
+| 118a | Categorías tickets | CRUD de categorías de tickets. | ⏳ |
+| 118b | Adjuntos tickets | Permitir adjuntar archivos a tickets. | ⏳ |
+| 118c | SLA tickets | Tiempos de respuesta/resolución por categoría y prioridad. | ⏳ |
+| 118d | Notas crédito/débito | Emitir y aplicar notas de crédito/débito. | ⏳ |
+| 118e | Recargo mora automático | Calcular y aplicar recargo por mora. | ⏳ |
+| 118f | Corte/suspensión lote | Suspender servicios en lote por mora. | ⏳ |
+| 118g | Estado cuenta cliente | Vista consolidada de saldo y facturas por cliente. | ⏳ |
+| 118h | Asignación/devolución equipos | Ciclo completo de equipos: stock → asignado → devuelto/baja. | ⏳ |
+| 118i | Logs auth explícitos | Registrar LOGIN, LOGOUT, LOGIN_FALLIDO en `auditoria_logs`. | ⏳ |
+| 118j | Revocación sesión admin | Admin puede revocar sesiones de otros usuarios. | ⏳ |
+| 118k | Reportes avanzados | Filtros, drill-down, exportar CSV. | ⏳ |
 
 ---
 
-## Hallazgos Bajos
+## Histórico cerradas
 
-| ID | Descripción | Spec | Estado |
-|----|-------------|------|--------|
-| AUD-2026-F11 | `window.selectedIds` sin limpieza | 064-limpiar-selected-ids | pendiente |
-| AUD-2026-F12 | Sin CSP/HSTS/X-Frame-Options | 062-headers-seguridad | pendiente |
-| AUD-2026-S07 | Credenciales hardcodeadas | 065-env-vars-bd | pendiente |
-| AUD-2026-S08 | `EMULATE_PREPARES` no seteado | 065-env-vars-bd | pendiente |
-| AUD-2026-AR04 | `router.php` dead code | 066-eliminar-dead-code | pendiente |
-| AUD-2026-I01 | Sin backups | 067-backups-automatizados | pendiente |
-| AUD-2026-I02 | Sin observabilidad | 068-observabilidad | pendiente |
-| AUD-2026-T01 | Cero tests | 069-ampliar-cobertura-tests | pendiente |
-| AUD-2026-T02 | Sin CI/CD | 070-ci-cd | pendiente |
-| AUD-2026-DOC02 | Sin ADRs | 071-adrs-faltantes | pendiente |
+| Spec | Nombre | Cerrada en |
+|---|---|---|
+| **139d** | **Controllers config (Rol, Permiso, Empresa) + 7 thin + `branding.css.php` + migrar `tests/audit_context.test.php` + borrar `conexion.php`. 5 tandas, 59/59 verde (A 23 + B 6 + C 22 + D 8 + E 0-refs + harness 9/9). Cierra Fase 1 MVC.** | **2026-10-18** |
+| 28 | BD — Base de datos (44 tablas, migración completa) | 2026-10-16 |
+| 139c | Controllers infra/soporte (7 controllers + 7 thin, 39/39 verde) | 2026-10-18 |
+| 001, 001a | decision-rbac, rbac-migracion-esquema | Fase 0 |
+| 002 | unique-factura-servicio-periodo | Grupo F |
+| 003 | indices-faltantes | Grupo F |
+| 005 | check-sesion-exclusiva | BD-COMPLETA |
+| 007 | timestamps-clientes | BD-COMPLETA |
+| 008 | validar-cedula | BD-COMPLETA |
+| 009 | validar-json-logs | BD-COMPLETA (falso positivo) |
+| 010 | permitir-multiples-equipos | 001a |
+| 011 | configuracion-singleton | BD-COMPLETA |
+| 012 | normalizar-enums | 001a |
+| 013 | timestamps-faltantes | BD-COMPLETA |
+| 015 | charset-unicode | BD-COMPLETA |
+| 016 | login-estado-usuario | Bloque 2 |
+| 017 | eliminar-session-nativo | Bloque 2 |
+| 018 | enforce-must-change-password | Bloque 2 |
+| 019 | fix-auditoria-logs | Bloque 2 |
+| 020 | pagos-gate-admin | Bloque 2 |
+| 021 | put-idempotencia | 2026-10-12 |
+| 022 | validar-insert-transiciones | vía triggers |
+| 023 | sacar-update-de-get | Grupo F |
+| 024 | proteger-api-empresa | 2026-10-12 |
+| 033 | logout-completo | Bloque 2 |
+| 034 | login-timing-constante | Bloque 2 |
+| 037 | reducir-polling | Bloque 3 |
+| 043 | mover-dump-fuera-webroot | Bloque 4 |
+| 061 | adrs-faltantes | Bloque 8 |
+| 072 | sincronizar-auditoria | Bloque 12 |
+| 073 | pagos-restringir-put | Bloque 12 |
+| 075 | limpiar-rol-huerfano | BD-COMPLETA |
+| 076 | filterBySearch-acentos | 2026-10-13 |
+| 097 | indices-logs | BD-COMPLETA |
+| 099 | rbac-dos-niveles | 2026-10-11 |
+| 100 | rbac-02-sod-config-backend | 2026-10-11 |
+| 101 | facturas-monto-pagado-saldo | BD-COMPLETA |
+| 102 | facturas-periodo-check | BD-COMPLETA |
+| 105 | historial-cambios-plan | BD-COMPLETA |
+| 106 | contratos-unico-vigente | BD-COMPLETA |
+| 108 | notificaciones-leido-en | BD-COMPLETA |
+| 109 | equipos-puerto-tinyint | BD-COMPLETA |
+| 110 | factura-lineas-id-servicio | BD-COMPLETA |
+| 112 | fks-on-update-cascade | BD-COMPLETA |
+| 113 | pagos-metodo-pago-tabla | BD-COMPLETA |
 
 ---
 
-## Specs planificadas
+## Histórico absorbidas — Specs
 
-Listado completo de specs, en orden de ejecución recomendado.
-
-| NNN | Nombre | Hallazgos cubiertos | Bloqueante |
-|-----|--------|---------------------|-----------|
-| 001 | fix-auditoria-logs | B03 | Sí |
-| 002 | limpiar-documentacion | DOC01 | No |
-| 003 | decision-rbac | 001, 002, D09, X01 | Sí |
-| 004 | eliminar-session-nativo | B01 | Sí |
-| 005 | login-estado-usuario | B02, X03 | Sí |
-| 006 | enforce-must-change-password | B04, X02 | Sí |
-| 007 | pagos-gate-admin | B05 | Sí |
-| 008 | mover-dump-fuera-webroot | S01 | Sí |
-| 009 | token-fuera-localstorage | F01, F02, F04 | Sí |
-| 010 | put-idempotencia | B06 | No |
-| 011 | validar-insert-transiciones | B07, X05 | No |
-| 012 | sacar-update-de-get | B08 | No |
-| 013 | proteger-api-empresa | B09 | No |
-| 014 | silenciar-errores-sql | B10 | No |
-| 015 | errores-unique-por-errorinfo | B11 | No |
-| 016 | unique-factura-servicio-periodo | B12, D11 | No |
-| 017 | quitar-id-plan-hardcoded | B13 | No |
-| 018 | fortaleza-passwords | B14, B15 | No |
-| 019 | eliminar-cliente-con-contratos | B16 | No |
-| 020 | permisos-gate-admin | B17, B18 | No |
-| 021 | preservar-trazabilidad-pagos | B19 | No |
-| 022 | limpiar-columnas-muertas | D01 | No |
-| ... | (resto de specs hasta 071) | ... | ... |
+| Spec | Nombre | Absorbida por | Cuándo | Nota |
+|---|---|---|---|---|
+| 004 | validar-pago-pertenencia | 137 (PagoService ya tiene BOLA check) | 2026-10-18 | — |
+| 025 | silenciar-errores-sql | 139c/139d (Response::fromException) | 2026-10-18 | — |
+| 026 | errores-unique-por-errorinfo | 139c (ConflictException) | 2026-10-18 | — |
+| 030 | permisos-gate-admin | 100 (SoD guard aplicado) | 2026-10-18 | — |
+| 032 | unificar-delete-params | 139a-d ($_GET['id'] consistente) | 2026-10-18 | — |
+| 039 | manejo-401-global | BUG-6.1 (parcial) | 2026-10-18 | Absorción parcial. Si queda interceptor de fetch residual, se añade como nueva spec al cierre de 140. |
+| 041 | modularizar-app-js | 140 | 2026-10-18 | — |
+| 050 | capa-servicios | 137 (absorbe 086) | 2026-10-18 | — |
+| 051 | separar-conexion | 139d (absorbe 087) | 2026-10-18 | — |
+| 065 | portal-cliente-real | 096a–096f | 2026-10-12 | — |
+| 066 | notificaciones | 086a–086d | 2026-10-12 | — |
+| 077 | reflejar-nombre-empresa | 078 (Design System) | 2026-10-18 | — |
+| 081 | modulo-instalaciones | 115d (UI pedidos) | 2026-10-18 | — |
+| 086 | capa-servicios (duplicado) | 050 | 2026-10-18 | — |
+| 087 | separar-conexion (duplicado) | 051 | 2026-10-18 | — |
+| 088 | env-vars-timezone | 049 | 2026-10-18 | — |
+| 090 | tests-endpoints | 053 | 2026-10-18 | — |
+| 091 | tests-frontend | 053 | 2026-10-18 | — |
+| 092 | ci-cd (duplicado) | 054 | 2026-10-18 | — |
+| 093 | health-check-backups | 057 + 058 | 2026-10-18 | — |
+| 094 | entidad-pedido | B28 (tabla `pedidos` en dump) | 2026-10-16 | — |
+| 095 | historial-360-cliente | 083 | 2026-10-18 | — |
+| 096 | portal-cliente-completo (Bloque 16) | 096a–096f | 2026-10-12 | — |
+| 103 | deprecar `servicios.ip_asignada` | 114c (migrar a `ip_asignaciones`) | 2026-10-18 | Spec de ADR 013 (P5). |
 
 ---
 
-## Cómo se actualiza este archivo
+## Histórico absorbidas — Bloques (marcadores sin número de spec)
 
-1. Al crear una spec: cambiar estado de `pendiente` a `en progreso`.
-2. Al cerrar una spec: cambiar estado a `cerrado`.
-3. Al diferir: cambiar estado a `diferido` y crear ADR en `docs/ADR/`.
-4. Al añadir hallazgos nuevos (re-auditoría): añadir fila con spec asignada.
+| Bloque | Nombre | Absorbido por | Cuándo |
+|---|---|---|---|
+| 030 (bloque) | Backend adaptado a BD + MVC | 139 (todos) | 2026-10-18 |
+| 031 (bloque) | Frontend adaptado + UI | 140 + Fase 3 | 2026-10-18 |
+
+---
+
+## Cómo se actualiza
+
+**Una spec, un lugar, una línea de qué hace.** Al cerrar una spec:
+
+1. Cambia `⏳`/`🔄` → `✅` en su fila.
+2. Mueve la fila a "Histórico cerradas". **Un solo movimiento.**
+3. Actualiza la línea "Estado actual" al inicio (conteo + siguiente).
+
+Nada más. No hay otro lugar del archivo donde aparezca esa spec.
+
+---
 
 ## Referencias
 
-- `docs/AUDITORIA_2026.md` — informe completo con evidencia.
-- `docs/METODOLOGIA_DESARROLLO_IA.md` — flujo SDD.
-- `docs/constitution.md` — principios.
-- `specs/` — carpeta con las specs.
+- `AUDITORIA_2026.md` — auditoría canónica (foto 2026-10-11).
+- `BD.md` — esquema de BD.
+- `ARQUITECTURA.md` — cómo está construido.
+- `GOBERNANZA.md` — mapa documental.
+- `MEMORY.md` — estado entre sesiones y hallazgos operativos.
+- `VERIFICACION.md` — lecciones de verificación.
+- `ADR/` — decisiones arquitectónicas (001–017).

@@ -1,0 +1,6 @@
+<Files "bd_redytelca.sql">
+    Require all denied
+</Files>
+<FilesMatch "\.(sql|md|log|bak)$">
+    Require all denied
+</FilesMatch>

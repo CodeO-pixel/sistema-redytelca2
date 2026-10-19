@@ -28,7 +28,6 @@ Abrir `http://localhost:8000` en el navegador.
 - `conexion.php` — middleware: conexión PDO + autenticación staff/cliente.
 - `index.html` + `app.js` + `styles.css` — frontend.
 - `bd_redytelca.sql` — fuente de verdad del esquema.
-- `specs/` — specs activas (SDD).
 - `tests/` — harness de tests. Ejecutar: `php tests/run.php`.
 - `docs/` — documentación. Ver `docs/README.md`.
 - `AGENTS.md` — reglas operativas para agentes IA.
@@ -48,4 +47,8 @@ Toda la documentación vive en `docs/`. Empezar por:
 
 ## Cómo trabajar en este proyecto
 
-Ver `docs/METODOLOGIA_DESARROLLO_IA.md`. Regla principal: nada se implementa sin spec aprobada.
+Ver `docs/METODOLOGIA_DESARROLLO_IA.md`. Regla principal: cada bloque
+de trabajo tiene un plan aprobado antes de tocar código. La IA auditora
+redacta prompts, el humano los lleva a AI Studio, la IA auditora verifica
+el resultado. Los planes de bloque viven fuera del repositorio, junto a
+los documentos de continuidad.

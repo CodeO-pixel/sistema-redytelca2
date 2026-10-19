@@ -7,9 +7,12 @@ Si algo los contradice, se para y se pregunta.
    XAMPP/cPanel sin instalación adicional. No se agregan dependencias salvo
    aprobación explícita y ADR.
 
-2. **La spec manda**: nada se implementa sin spec activa en `specs/`. Si falta una
-   decisión, se para y se pregunta. Los hallazgos de auditoría se convierten en
-   specs antes de tocarse.
+2. **El bloque activo manda**: nada se implementa sin que exista un plan de
+   bloque activo aprobado por el humano. El plan vive fuera del repositorio,
+   junto a los documentos de continuidad (`PROMPT DE INICIO`, `PLAN DEL BLOQUE
+   ACTIVO`). Si falta una decisión, se para y se pregunta. Los hallazgos
+   de auditoría se convierten en entradas del roadmap y, si aplica, en un plan
+   de bloque antes de tocarse. Ver `docs/GOBERNANZA.md` §3 y §6.3.
 
 3. **`bd_redytelca.sql` es la fuente de verdad del esquema**: no se toca el DDL sin
    spec aprobada, migración de datos documentada y rollback probado.
@@ -27,6 +30,35 @@ Si algo los contradice, se para y se pregunta.
 7. **Idioma**: código y nombres de archivo en inglés/snake_case; interfaz,
    comentarios y documentación en español.
 
-8. **Trazabilidad**: cada corrección es una spec; cada spec cierra hallazgos
-   concretos de `docs/AUDITORIA_2026.md`; cada cierre actualiza `MEMORY.md` y
+8. **Trazabilidad**: cada corrección cierra hallazgos concretos de
+   `docs/AUDITORIA_2026.md` (si es canónico) o resuelve una decisión de diseño
+   registrada en un ADR. Los hallazgos operativos (fuera de auditoría general)
+   viven en `MEMORY.md`, no en el canónico. Cada cierre actualiza `MEMORY.md` y
    `docs/ROADMAP.md`.
+
+9. **Rigor de fuentes**: antes de afirmar un número (archivos afectados, tablas,
+   líneas, conteos), se verifica contra `bd_redytelca.sql` y el dump del proyecto.
+   Antes de proponer una decisión de diseño, se cita al menos un sistema en
+   producción (AWS, ServiceNow, Microsoft, Salesforce, Google) que resuelva el
+   mismo problema. Si no hay fuente, se declara explícitamente: "propuesta sin
+   respaldo de industria verificado". No se inventan estándares ni se atribuyen
+   prácticas a empresas sin cita comprobable.
+
+10. **Recomendación = estándar, no comodidad**: toda recomendación del agente
+    debe seguir el estándar de industria citado, incluso si implica más trabajo,
+    más cambios, más riesgo o más esfuerzo de verificación. Está terminantemente
+    prohibido recomendar la opción "más cómoda", "más simple", "menos disruptiva"
+    o "más rápida" si no cumple el estándar. Si el estándar exige X, se recomienda
+    X. La comodidad del agente, del proceso o del humano no es un criterio válido
+    para desviarse del estándar. Si el estándar tiene trade-offs documentados y
+    no hay una única respuesta correcta, se presentan las opciones **con su
+    fundamento de industria** y se declara explícitamente cuál es la más alineada
+    al estándar. Nunca se disfraza la comodidad de recomendación técnica.
+
+11. **Los documentos se leen del dump antes de modificarse.** Ningún archivo de
+    documentación se modifica sin leerlo del dump en el mismo turno en que se
+    modifica. La memoria del agente no es fuente de verdad sobre el contenido de
+    un archivo, una sección, un número de línea o un número de principio. Cada
+    diff de documentación cita la sección exacta verificada contra el dump en ese
+    turno. Si la sección no existe o no coincide con lo esperado, se aborta y se
+    reporta. No hay excepciones.

@@ -43,7 +43,7 @@ El cliente envía el token por header `X-Session-Token` (con fallback a query st
 - Sin dependencias externas.
 
 ### Negativas
-- Consulta a BD en cada request (`SELECT ... FROM sesiones JOIN usuarios ...`). Mitigable con caché (spec 040-cache-sesiones).
+- Consulta a BD en cada request (`SELECT ... FROM sesiones JOIN usuarios ...`). Mitigable con caché (spec 069-cache-sesiones).
 - La tabla `sesiones` crece indefinidamente (purga de expiradas >60 días en login).
 
 ### Neutras

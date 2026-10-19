@@ -45,7 +45,7 @@ Usar **PHP puro + PDO** en backend y **HTML/CSS/JavaScript vanilla** en frontend
 
 ### Negativas
 - Sin validación automática de formularios, sin ORM, sin sistema de vistas.
-- `app.js` ha crecido a ~2500 líneas sin estructura (hallazgo AUD-2026-F10).
+- `app.js` ha crecido a ~2500 líneas sin estructura (hallazgo AUD-2026-F10, spec 041-modularizar-app-js).
 - Ruteo manual en cada endpoint (`$method === 'GET'`, `'POST'`, etc.).
 - Sin migraciones automatizadas; el esquema se versiona como dump SQL.
 

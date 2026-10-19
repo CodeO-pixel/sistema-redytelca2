@@ -1,21 +1,18 @@
 <?php
+// usuarios_listar.php
 header('Content-Type: application/json; charset=utf-8');
-require 'conexion.php';
-requireStaffAuth($pdo);
+require_once __DIR__ . '/core/Bootstrap.php';
 
-$query = "
-    SELECT u.id_usuario, u.username, u.email, u.must_change_password, u.email_verified, u.id_rol, r.nombre_rol,
-           u.estado,
-           (SELECT MAX(creado_en) FROM sesiones WHERE id_usuario = u.id_usuario) AS ultima_conexion
-    FROM usuarios u
-    LEFT JOIN rol r ON r.id_rol = u.id_rol
-    ORDER BY u.username ASC
-";
+use App\Controllers\UsuarioController;
+use App\Core\Auth;
+use App\Core\Http;
+use App\Core\Response;
 
-$stmt = $pdo->query($query);
-$usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-echo json_encode([
-    'status' => 'success',
-    'usuarios' => $usuarios
-]);
+try {
+    $pdo = Http::init();
+    Auth::requirePageAccess($pdo, 'usuarios');
+    Auth::requireOperation($pdo, 'usuarios', 'leer');
+    (new UsuarioController($pdo))->index();
+} catch (\Throwable $e) {
+    Response::fromException($e);
+}

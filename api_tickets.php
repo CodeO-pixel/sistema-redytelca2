@@ -1,74 +1,36 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-require 'conexion.php';
-requirePageAccess($pdo, 'tickets');
+require_once __DIR__ . '/core/Bootstrap.php';
 
-$method = $_SERVER['REQUEST_METHOD'];
-// Auto-reparación de esquema eliminada (Prompt 5): bd_redytelca.sql es la fuente de verdad desde Fase 0, este bloque siempre resolvía a no-op.
+use App\Controllers\TicketController;
+use App\Core\Auth;
+use App\Core\Http;
+use App\Core\Response;
 
-if ($method === 'GET') {
-    $stmt = $pdo->query("SELECT t.*, c.nombres, c.apellidos, u.username AS creador FROM tickets t LEFT JOIN clientes c ON c.id_cliente = t.id_cliente LEFT JOIN usuarios u ON u.id_usuario = t.id_usuario_creador ORDER BY t.creado_en DESC");
-    echo json_encode(['status' => 'success', 'tickets' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
-    exit;
-}
+try {
+    $pdo = Http::init();
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $controller = new TicketController($pdo);
 
-$input = json_decode(file_get_contents('php://input'), true);
-if (!$input) {
-    $input = $_POST;
-}
-
-if ($method === 'POST') {
-    $asunto = trim($input['asunto'] ?? '');
-    $descripcion = trim($input['descripcion'] ?? '');
-    $estado = trim($input['estado'] ?? 'Abierto');
-    $prioridad = trim($input['prioridad'] ?? 'Media');
-    $id_cliente = (isset($input['id_cliente']) && $input['id_cliente'] !== '' && $input['id_cliente'] !== null) ? (int)$input['id_cliente'] : null;
-    $id_usuario_creador = (isset($input['id_usuario_creador']) && $input['id_usuario_creador'] !== '' && $input['id_usuario_creador'] !== null) ? (int)$input['id_usuario_creador'] : null;
-    $origen = trim($input['origen'] ?? 'backoffice');
-    if ($origen !== 'portal_cliente' && $origen !== 'backoffice') {
-        $origen = 'backoffice';
+    if ($method === 'GET') {
+        Auth::requirePageAccess($pdo, 'tickets');
+        Auth::requireOperation($pdo, 'tickets', 'leer');
+        $controller->index();
+    } elseif ($method === 'POST') {
+        Auth::requirePageAccess($pdo, 'tickets');
+        Auth::requireOperation($pdo, 'tickets', 'crear');
+        $controller->store();
+    } elseif ($method === 'PUT') {
+        Auth::requirePageAccess($pdo, 'tickets');
+        Auth::requireOperation($pdo, 'tickets', 'editar');
+        $controller->update();
+    } elseif ($method === 'DELETE') {
+        Auth::requirePageAccess($pdo, 'tickets');
+        Auth::requireOperation($pdo, 'tickets', 'eliminar');
+        $controller->destroy();
+    } else {
+        Response::error('Método no soportado', 405);
     }
-
-    if ($asunto === '') {
-        echo json_encode(['status' => 'error', 'message' => 'El asunto es obligatorio']);
-        exit;
-    }
-
-    $stmt = $pdo->prepare("INSERT INTO tickets (asunto, descripcion, estado, prioridad, id_cliente, id_usuario_creador, origen) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $ok = $stmt->execute([$asunto, $descripcion, $estado, $prioridad, $id_cliente, $id_usuario_creador, $origen]);
-
-    echo json_encode(['status' => $ok ? 'success' : 'error', 'message' => $ok ? 'Ticket creado correctamente' : 'No se pudo crear el ticket']);
-    exit;
+} catch (\Throwable $e) {
+    Response::fromException($e);
 }
-
-if ($method === 'PUT') {
-    $id = (int)($input['id_ticket'] ?? 0);
-    $origen = trim($input['origen'] ?? 'backoffice');
-    if ($origen !== 'portal_cliente' && $origen !== 'backoffice') {
-        $origen = 'backoffice';
-    }
-
-    $stmt = $pdo->prepare("UPDATE tickets SET asunto = ?, descripcion = ?, estado = ?, prioridad = ?, id_cliente = ?, id_usuario_creador = ?, origen = ? WHERE id_ticket = ?");
-    $ok = $stmt->execute([
-        trim($input['asunto'] ?? ''),
-        trim($input['descripcion'] ?? ''),
-        trim($input['estado'] ?? 'Abierto'),
-        trim($input['prioridad'] ?? 'Media'),
-        (isset($input['id_cliente']) && $input['id_cliente'] !== '' && $input['id_cliente'] !== null) ? (int)$input['id_cliente'] : null,
-        (isset($input['id_usuario_creador']) && $input['id_usuario_creador'] !== '' && $input['id_usuario_creador'] !== null) ? (int)$input['id_usuario_creador'] : null,
-        $origen,
-        $id
-    ]);
-    echo json_encode(['status' => $ok ? 'success' : 'error', 'message' => $ok ? 'Ticket actualizado' : 'No se pudo actualizar']);
-    exit;
-}
-
-if ($method === 'DELETE') {
-    $id = (int)($_GET['id'] ?? 0);
-    $stmt = $pdo->prepare("DELETE FROM tickets WHERE id_ticket = ?");
-    $ok = $stmt->execute([$id]);
-    echo json_encode(['status' => $ok ? 'success' : 'error', 'message' => $ok ? 'Ticket eliminado' : 'No se pudo eliminar']);
-    exit;
-}
-
-echo json_encode(['status' => 'error', 'message' => 'Método no soportado']);
