@@ -20,8 +20,8 @@ package-lock.json
 config.local.php
 
 # --- Archivos subidos por usuarios ---
-/uploads/
-!uploads/.gitkeep
+/public/uploads/
+!public/uploads/.gitkeep
 
 # --- Logs ---
 *.log
