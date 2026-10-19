@@ -14,7 +14,7 @@ Backend PHP 8.2 + PDO + MariaDB. Frontend vanilla JS sin build tools. Uso intern
 
 ```bash
 # Desde la raíz del proyecto
-php -S localhost:8000
+php -S localhost:8000 -t public public/router.php
 
 # Importar la base de datos
 mysql -u root bd_redytelca < bd_redytelca.sql
@@ -22,13 +22,21 @@ mysql -u root bd_redytelca < bd_redytelca.sql
 
 Abrir `http://localhost:8000` en el navegador.
 
+El router script (`public/router.php`) es necesario para que `/cliente` y `/admin` funcionen con `php -S`.
+
 ## Estructura
 
-- `api_*.php` — endpoints JSON del backend.
-- `conexion.php` — middleware: conexión PDO + autenticación staff/cliente.
-- `index.html` + `app.js` + `styles.css` — frontend.
+- `public/` — DocumentRoot. Solo esto se sirve por HTTP.
+  - `api_*.php` — endpoints JSON del backend (thin files).
+  - `index.html` + `app.js` + `styles.css` — frontend.
+  - `portal_cliente.php` — portal de pago (stub, se implementa en Fase 5).
+  - `router.php` — routing para `php -S` y Apache (fallback).
+  - `Logos/`, `uploads/` — assets.
+- `src/` — código fuente. No se sirve por HTTP.
+  - `core/` — kernel MVC (Bootstrap, Config, Database, Response, Validator, Auth, Exceptions, bases).
+  - `controllers/`, `services/`, `repositories/`, `models/`, `validators/` — capas MVC.
+  - `tests/` — harness de tests. Ejecutar: `php src/tests/run.php`.
 - `bd_redytelca.sql` — fuente de verdad del esquema.
-- `tests/` — harness de tests. Ejecutar: `php tests/run.php`.
 - `docs/` — documentación. Ver `docs/README.md`.
 - `AGENTS.md` — reglas operativas para agentes IA.
 - `MEMORY.md` — estado del proyecto entre sesiones.

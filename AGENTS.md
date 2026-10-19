@@ -21,14 +21,15 @@ No lleva:
 - Backend: PHP 8.2 + PDO + MariaDB 10.4. Sin frameworks, sin Composer.
 - Frontend: HTML/CSS/JS puro. Sin npm, sin bundler.
 - BD: `bd_redytelca.sql` es la fuente de verdad del esquema.
-- Endpoints: `api_*.php` (thin, patrón 139a–d).
-- **Kernel MVC: `core/`** (Bootstrap, Config, Database, Response,
+- **Estructura:** `public/` (DocumentRoot, único servido por HTTP) + `src/` (código: core, controllers, services, repositories, models, validators, tests) + raíz (BD, docs, config). ADR 018.
+- Endpoints: `public/api_*.php` (thin, patrón 139a–e). `public/` también contiene `login.php`, `logout.php`, `auth_state.php`, `cambiar_password.php`, `clientes_listar.php`, `registrar_cliente.php`, `cliente_*.php`, `roles_*.php`, `permisos_*.php`, `usuarios_*.php`, `branding.css.php`, `portal_cliente.php`, `router.php`, `index.html`, `app.js`, `styles.css`, `Logos/`, `uploads/`.
+- **Kernel MVC: `src/core/`** (Bootstrap, Config, Database, Response,
   Validator, Auth, Exceptions, bases). Inicialización vía `Http::init()`.
   Auth vía `Auth::requireStaffAuth` / `Auth::requireClientAuth` /
   `Auth::requirePageAccess` / `Auth::requireOperation`.
 - **`conexion.php` fue eliminado en 139d Tanda E (2026-10-18).** La
-  fuente de verdad del auth y del PDO es `core/`.
-- Frontend: `index.html` + `app.js` + `styles.css`. **`app.js` se
+  fuente de verdad del auth y del PDO es `src/core/`.
+- Frontend: `public/index.html` + `public/app.js` + `public/styles.css`. **`app.js` se
   reemplaza por `js/core|models|views|controllers/` en 140.** Hasta
   entonces, conviven ambos.
 - Docs: ver `docs/README.md`. Estado actual y fase activa: ver
@@ -38,9 +39,9 @@ No lleva:
 
 ## Comandos
 
-- Arranque local: `php -S localhost:8000` desde la raíz.
+- Arranque local: `php -S localhost:8000 -t public public/router.php` desde la raíz. El router script es necesario para `/cliente`, `/portal`, `/pagos`, `/pago` → `portal_cliente.php` y `/admin`, `/` → `index.html`.
 - Importar BD: `mysql -u root bd_redytelca < bd_redytelca.sql`
-- Tests: `php tests/run.php`
+- Tests: `php src/tests/run.php`
 
 ---
 
@@ -67,11 +68,11 @@ No lleva:
   patrón.
 - **`<?php` debe ser la primera línea del archivo (byte 0).** Comentario
   `// filename` va en línea 2, nunca antes. Un `// filename` antes de
-  `<?php` se emite como output literal antes del parseo; `header()`
-  falla con "headers already sent" y el body JSON/CSS llega con prefijo
-  de texto. AI Studio invierte el orden sistemáticamente en archivos
+  `<?php` se emite como output literal antes del parseo; `header()` falla
+  con "headers already sent" y el body JSON/CSS llega con prefijo de
+  texto. AI Studio invierte el orden sistemáticamente en archivos
   nuevos. Verificar en cada entrega.
-- **Endpoints thin (patrón 139a–d):**
+- **Endpoints thin (patrón 139a–e):**
   - Cada verbo HTTP tiene su `requirePageAccess` + `requireOperation`.
   - El controller inyecta `$pdo` por constructor; el service hace la
     lógica de negocio; el repository contiene el SQL.
@@ -98,7 +99,7 @@ No lleva:
 - Transiciones de estado validadas en `transicion_estado` (BEFORE UPDATE
   e INSERT).
 - RBAC: dos niveles (visibilidad `rol_modulo_pagina` + operación
-  `rol_modulo_permiso`). Middleware en `core/Auth.php`.
+  `rol_modulo_permiso`). Middleware en `src/core/Auth.php`.
 - **Guard SoD del módulo Configuración vive en `Auth::requirePageAccess()`,**
   no en `requireOperation()`. Rechaza con 403 si la página pertenece al
   módulo 4 (Configuración) y el usuario no tiene rol 1 (Administrador).
@@ -132,6 +133,16 @@ No lleva:
 - **`CONVERT TO CHARACTER SET` de MariaDB 10.4 reconstruye la tabla y
   puede descartar CHECKs.** Aunque el dump no los muestre, la BD los
   conserva en `information_schema`. No asumir pérdida sin verificar.
+- **`php -S` con router script.** El router (`public/router.php`) usa
+  `return false;` en el fallback para delegar a `php -S` y que sirva el
+  archivo (ejecutándolo si es PHP). Sin el `return false;`, el router
+  intentaba `readfile()` con concatenación sin slash y devolvía 404.
+  Bug latente expuesto por `php -S`; con Apache el `.htaccess` con
+  `RewriteCond !-f` no invoca el router para archivos existentes. Ver
+  ADR 018.
+- **`/cliente`, `/portal`, `/pagos`, `/pago` → `portal_cliente.php`** y
+  **`/admin`, `/` → `index.html`** solo funcionan si el router script
+  se pasa a `php -S` como último argumento. Ver §Comandos.
 - Ver `docs/constitution.md` y el plan de la fase activa antes de tocar
   código.
 
@@ -162,13 +173,12 @@ No lleva:
   Esperado + precondición de abort. El humano ejecuta, pega salidas
   literales, el agente audita. El agente no ejecuta. Ver
   `docs/METODOLOGIA_DESARROLLO_IA.md` § 5.5.
-- **Harness casero:** `tests/run.php` ejecuta `tests/smoke.test.php` y
-  `tests/audit_context.test.php`. Ambos usan `core/Bootstrap.php` +
-  `core/Auth.php` (migrado de `conexion.php` en 139d Tanda E).
+- **Harness casero:** `src/tests/run.php` ejecuta `src/tests/smoke.test.php` y
+  `src/tests/audit_context.test.php`. Ambos usan `src/core/Bootstrap.php` + `src/core/Auth.php` (migrado de `conexion.php` en 139d Tanda E).
 - **Sin CI/CD.** Sin tests de endpoints ni de frontend. Las specs
-  139a–139d se verifican con curl + SQL. Se documenta en `MEMORY.md`.
+  139a–139e se verifican con curl + SQL. Se documenta en `MEMORY.md`.
 - **Después de cada cambio:** `php -l` sobre todos los archivos tocados,
-  `php tests/run.php`, y la verificación curl+SQL específica de la spec.
+  `php src/tests/run.php`, y la verificación curl+SQL específica de la spec.
 - **Pruebas aisladas de backend:** si en algún momento (post-140) se
   prueba con curl y la app está abierta, cerrar todas las pestañas
   antes: `initApp()` dispara cargas en segundo plano que interfieren.
