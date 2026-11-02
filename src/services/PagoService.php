@@ -15,6 +15,25 @@ use App\Repositories\MetodoPagoRepository;
 
 /**
  * Servicio para la gestión de pagos.
+ *
+ * B3.6-hotfix: crear() valida que el monto del pago no exceda el saldo
+ * pendiente en USD de la factura. La tasa BCV del pago es libre (tasa
+ * del día del pago); no se compara con la tasa de la factura porque
+ * cada pago se registra a la tasa vigente en su fecha. La diferencia
+ * de tasa entre factura y pago es una ganancia/pérdida cambiaria, no
+ * un error. Práctica estándar en Splynx, ERP multi-moneda y facturación
+ * venezolana.
+ *
+ * A2-B.1: integra NotificacionService en crear() (si origen='portal_cliente')
+ * y actualizar() (si estado cambia a validado/rechazado). Transaccional:
+ * si la notificación falla, el cambio de pago hace rollback.
+ *
+ * A2-B.4.c: crear() valida ownership de `servicio_id` (que el servicio
+ * pertenezca al cliente del pago). Cierra un bug latente donde un
+ * admin (o un cliente vía portal) podía mandar `cliente_id` de A y
+ * `servicio_id` de B. Defensa BOLA/IDOR (OWASP API Security Top 10
+ * 2023, API1:2023). El cliente del portal siempre manda el `cliente_id`
+ * de su propia sesión, pero el fix protege también el path admin.
  */
 final class PagoService extends BaseService
 {
@@ -33,6 +52,9 @@ final class PagoService extends BaseService
     /** @var MetodoPagoRepository */
     private MetodoPagoRepository $metodoRepo;
 
+    /** @var NotificacionService */
+    private NotificacionService $notificacionService;
+
     /**
      * Constructor del servicio.
      *
@@ -46,10 +68,23 @@ final class PagoService extends BaseService
         $this->clienteRepo = new ClienteRepository($pdo);
         $this->servicioRepo = new ServicioRepository($pdo);
         $this->metodoRepo = new MetodoPagoRepository($pdo);
+        $this->notificacionService = new NotificacionService($pdo);
     }
 
     /**
      * Crea un nuevo pago.
+     *
+     * Si `origen='portal_cliente'`, dispara `eventoPagoSubido`: notifica
+     * al cliente (confirmación) y a todos los admins activos (excepto
+     * al generador, si lo hubiera). En backoffice, no notifica.
+     *
+     * Transaccional: si la notificación falla, el pago hace rollback.
+     *
+     * Validaciones de ownership (A2-B.4.c):
+     *   - `cliente_id` debe existir.
+     *   - `servicio_id` debe existir Y pertenecer al cliente.
+     *   - Si `factura_id`, debe existir Y pertenecer al cliente Y al
+     *     servicio.
      *
      * @param array $datos
      * @return int
@@ -62,8 +97,21 @@ final class PagoService extends BaseService
             throw new NotFoundException('Cliente no encontrado.');
         }
 
+        $clienteId = (int) $datos['cliente_id'];
+
         if (!isset($datos['servicio_id']) || !$this->servicioRepo->exists((int) $datos['servicio_id'])) {
             throw new NotFoundException('Servicio no encontrado.');
+        }
+
+        $servicioId = (int) $datos['servicio_id'];
+
+        // A2-B.4.c — ownership de servicio_id: el servicio debe pertenecer
+        // al cliente del pago. Cierra BOLA/IDOR.
+        $servicio = $this->servicioRepo->findById($servicioId);
+        if ($servicio === null || (int) $servicio['cliente_id'] !== $clienteId) {
+            throw new ValidationException([
+                'servicio_id' => 'El servicio no pertenece al cliente del pago.'
+            ]);
         }
 
         if (!empty($datos['factura_id'])) {
@@ -71,25 +119,31 @@ final class PagoService extends BaseService
             if (!$factura) {
                 throw new NotFoundException('Factura no encontrada.');
             }
+
             // Prevención BOLA/IDOR: la factura debe pertenecer al cliente
-            // del pago. Usa findByClienteIdAndFacturaId (136c).
-            $pertenece = $this->pagoRepo->findByClienteIdAndFacturaId(
-                (int) $datos['cliente_id'],
-                (int) $datos['factura_id']
-            );
-            if (empty($pertenece)) {
-                // Verificación alternativa: la factura referencia un servicio
-                // que pertenece al cliente del pago.
-                $servicioFactura = $this->servicioRepo->findById((int) $factura['servicio_id']);
-                if (!$servicioFactura || (int) $servicioFactura['cliente_id'] !== (int) $datos['cliente_id']) {
-                    throw new ValidationException(['factura_id' => 'La factura no pertenece al cliente del pago.']);
-                }
+            // del pago. Se valida vía el servicio de la factura, no vía
+            // el cliente_id del pago (que podría estar manipulado).
+            $servicioFactura = $this->servicioRepo->findById((int) $factura['servicio_id']);
+            if (!$servicioFactura || (int) $servicioFactura['cliente_id'] !== $clienteId) {
+                throw new ValidationException(['factura_id' => 'La factura no pertenece al cliente del pago.']);
             }
 
-            if (isset($datos['servicio_id'])) {
-                if ((int) $factura['servicio_id'] !== (int) $datos['servicio_id']) {
-                    throw new ValidationException(['factura_id' => 'La factura no pertenece al servicio indicado.']);
-                }
+            if ((int) $factura['servicio_id'] !== $servicioId) {
+                throw new ValidationException(['factura_id' => 'La factura no pertenece al servicio indicado.']);
+            }
+
+            $totalValidado = $this->pagoRepo->sumValidadosByFacturaId((int) $datos['factura_id']);
+            $saldoPendiente = max(0.0, (float) $factura['monto'] - $totalValidado);
+            $montoPago = (float) ($datos['monto'] ?? 0);
+
+            if ($montoPago > $saldoPendiente + 0.01) {
+                throw new ValidationException([
+                    'monto' => sprintf(
+                        'El monto del pago ($%.2f) excede el saldo pendiente de la factura ($%.2f). Registra el exceso como pago a cuenta (sin factura) o reduce el monto.',
+                        $montoPago,
+                        $saldoPendiente
+                    )
+                ]);
             }
         }
 
@@ -117,11 +171,34 @@ final class PagoService extends BaseService
         }
         $datos['origen'] = $origen;
 
-        return $this->pagoRepo->create($datos);
+        $closure = function () use ($datos) {
+            $pagoId = $this->pagoRepo->create($datos);
+
+            if ($datos['origen'] === 'portal_cliente') {
+                $this->notificacionService->eventoPagoSubido(
+                    $pagoId,
+                    (int) $datos['cliente_id'],
+                    (float) $datos['monto'],
+                    (string) ($datos['moneda_pago'] ?? 'USD')
+                );
+            }
+
+            return $pagoId;
+        };
+
+        if ($this->pdo->inTransaction()) {
+            return $closure();
+        }
+        return $this->transaction($closure);
     }
 
     /**
      * Actualiza un pago existente y reconcilia las facturas afectadas.
+     *
+     * Si el estado cambia a `validado` o `rechazado`, notifica al cliente
+     * vía `eventoPagoValidado` / `eventoPagoRechazado`. La notificación va
+     * dentro de la transacción existente: si falla, la actualización del
+     * pago y la reconciliación de la factura hacen rollback.
      *
      * @param int $id
      * @param array $datos
@@ -152,8 +229,6 @@ final class PagoService extends BaseService
             $datos['usuario_valido_id'] = $idUsuarioValido;
         }
 
-        // Prevención BOLA/IDOR: si el caller reasigna la factura, la nueva
-        // factura debe pertenecer al mismo cliente del pago.
         if (array_key_exists('factura_id', $datos) && !empty($datos['factura_id'])) {
             $factura = $this->facturaRepo->findById((int) $datos['factura_id']);
             if (!$factura) {
@@ -162,6 +237,19 @@ final class PagoService extends BaseService
             $servicioFactura = $this->servicioRepo->findById((int) $factura['servicio_id']);
             if (!$servicioFactura || (int) $servicioFactura['cliente_id'] !== (int) $pago['cliente_id']) {
                 throw new ValidationException(['factura_id' => 'La factura no pertenece al cliente del pago.']);
+            }
+        }
+
+        if (array_key_exists('servicio_id', $datos) && $datos['servicio_id'] !== null && $datos['servicio_id'] !== '') {
+            $facturaRefId = array_key_exists('factura_id', $datos)
+                ? ($datos['factura_id'] ? (int) $datos['factura_id'] : 0)
+                : ($pago['factura_id'] ? (int) $pago['factura_id'] : 0);
+
+            if ($facturaRefId > 0) {
+                $facturaRef = $this->facturaRepo->findById($facturaRefId);
+                if ($facturaRef && (int) $facturaRef['servicio_id'] !== (int) $datos['servicio_id']) {
+                    throw new ValidationException(['servicio_id' => 'El servicio_id no coincide con el servicio de la factura del pago.']);
+                }
             }
         }
 
@@ -175,7 +263,7 @@ final class PagoService extends BaseService
             $datos['tasa_cambio'] = null;
         }
 
-        $this->transaction(function () use ($id, $datos, $pago) {
+        $this->transaction(function () use ($id, $datos, $pago, $estadoActual, $nuevoEstado, $idUsuarioValido) {
             $this->pagoRepo->update($id, $datos);
 
             $facturaAnteriorId = $pago['factura_id'] ? (int) $pago['factura_id'] : null;
@@ -188,6 +276,21 @@ final class PagoService extends BaseService
             }
             if ($facturaNuevaId !== null) {
                 $this->reconciliarFactura($facturaNuevaId);
+            }
+
+            // Notificación al cliente si el estado del pago cambió.
+            if ($nuevoEstado !== $estadoActual && in_array($nuevoEstado, ['validado', 'rechazado'], true)) {
+                $clienteId = (int) $pago['cliente_id'];
+                $monto = (float) $pago['monto'];
+                $monedaPago = (string) ($pago['moneda_pago'] ?? 'USD');
+                $adminId = (int) ($idUsuarioValido ?? 0);
+
+                if ($nuevoEstado === 'validado') {
+                    $this->notificacionService->eventoPagoValidado($id, $clienteId, $monto, $monedaPago, $adminId);
+                } else {
+                    $motivo = (string) ($datos['motivo_rechazo'] ?? $pago['motivo_rechazo'] ?? 'Sin motivo especificado');
+                    $this->notificacionService->eventoPagoRechazado($id, $clienteId, $monto, $monedaPago, $adminId, $motivo);
+                }
             }
         });
     }
@@ -278,7 +381,6 @@ final class PagoService extends BaseService
 
     /**
      * Método privado. Replica reconciliarFactura() de api_pagos.php.
-     * No se llama desde fuera del service.
      *
      * @param int $facturaId
      * @return void

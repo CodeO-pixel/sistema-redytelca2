@@ -96,5 +96,12 @@ final class EmpresaService extends BaseService
         if (isset($datos['dias_corte_automatico']) && $datos['dias_corte_automatico'] < 0) {
             throw new ValidationException(['dias_corte_automatico' => 'Los días de corte no pueden ser negativos.']);
         }
+
+        if (isset($datos['color_primario'])) {
+            $color = trim((string) $datos['color_primario']);
+            if ($color !== '' && !preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+                throw new ValidationException(['color_primario' => 'El color debe tener formato #RRGGBB.']);
+            }
+        }
     }
 }

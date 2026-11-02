@@ -17,6 +17,31 @@ final class EquipoRepository extends BaseRepository
     protected string $primaryKey = 'id';
 
     /**
+     * Obtiene todos los equipos ordenados por ID ascendente.
+     * Incluye el código de la NAP (nap_codigo), nombres, apellidos y cédula del cliente,
+     * y el alias del servicio (servicio_alias).
+     *
+     * @return array
+     */
+    public function findAll(): array
+    {
+        $sql = "SELECT eq.*, 
+                       na.codigo AS nap_codigo, 
+                       c.nombre AS nombres, 
+                       c.apellido AS apellidos, 
+                       c.cedula AS cedula,
+                       s.alias AS servicio_alias
+                FROM {$this->table} eq
+                INNER JOIN naps na ON na.id = eq.nap_id
+                LEFT JOIN servicios s ON s.id = eq.servicio_id
+                LEFT JOIN clientes c ON c.id = s.cliente_id
+                ORDER BY eq.id ASC";
+        $stmt = $this->pdo->query($sql);
+
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
      * Busca un equipo por su dirección MAC.
      *
      * @param string $mac

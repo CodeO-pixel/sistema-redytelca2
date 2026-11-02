@@ -13,13 +13,13 @@ try {
     $controller = new PedidoController($pdo);
 
     if ($method === 'GET') {
-        Auth::requirePageAccess($pdo, 'pedidos');
+        $staffSession = Auth::requirePageAccess($pdo, 'pedidos');
         Auth::requireOperation($pdo, 'pedidos', 'leer');
-        $controller->index();
+        $controller->index($staffSession);
     } elseif ($method === 'POST') {
-        Auth::requirePageAccess($pdo, 'pedidos');
+        $staffSession = Auth::requirePageAccess($pdo, 'pedidos');
         Auth::requireOperation($pdo, 'pedidos', 'crear');
-        $controller->store();
+        $controller->store($staffSession);
     } elseif ($method === 'PUT') {
         Auth::requirePageAccess($pdo, 'pedidos');
         Auth::requireOperation($pdo, 'pedidos', 'editar');

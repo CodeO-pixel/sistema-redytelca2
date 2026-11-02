@@ -4,13 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>REDYTELCA Admin</title>
+<link rel="icon" type="image/png" href="Logos/logo_transparent.png">
+<meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 <script>
-// Aplica el branding cacheado ANTES de que styles.css se procese.
-// Debe ir antes del <link rel="stylesheet"> para ganar en orden de
-// aplicación. Elimina el FOUC (Flash Of Unstyled Content) en
-// cualquier navegación posterior. En incógnito/primera visita,
-// no hay cache y se ve un flash de ~200ms la primera vez.
 (function () {
 try {
 var raw = localStorage.getItem('redytelca_empresa_config');
@@ -26,49 +23,88 @@ var g = parseInt(hex.substring(2, 4), 16);
 var b = parseInt(hex.substring(4, 6), 16);
 document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' + b);
 }
-} catch (e) { /* localStorage corrupto, ignorar */ }
+} catch (e) { }
 })();
 </script>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="branding.css.php">
+<script>
+(function () {
+try {
+var raw = localStorage.getItem('redytelca_session');
+if (!raw) {
+document.documentElement.classList.add('login-visible');
+return;
+}
+var s = JSON.parse(raw);
+if (s && s.token) {
+document.documentElement.setAttribute('data-has-session', '1');
+} else {
+document.documentElement.classList.add('login-visible');
+}
+} catch (e) {
+document.documentElement.classList.add('login-visible');
+}
+})();
+</script>
+<style>
+html[data-has-session="1"] #login-overlay { display: none !important; }
+html.login-visible, html.login-visible body { overflow: hidden; }
+</style>
 </head>
 <body>
-<div id="login-overlay">
+<div id="login-overlay" style="display:flex;">
     <div class="card login-box">
-        <div class="login-brand"><img id="login-brand-logo" src="Logos/logo_transparent.png" alt="REDYTELCA" class="login-brand-logo"></div>
+        <div class="login-brand">
+            <img id="login-brand-logo" src="branding-logo.php?slot=login" alt="REDYTELCA" class="login-brand-logo">
+        </div>
         <h3>Iniciar sesión</h3>
         <input id="user" type="text" placeholder="Usuario" autocomplete="username">
         <input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password">
-        <button id="login-button" type="button" onclick="login()">Ingresar</button>
+        <button id="login-button" type="button">Ingresar</button>
     </div>
 </div>
 
 <div class="sidebar">
     <div class="brand">
         <div class="brand-logo-wrap">
-            <img id="sidebar-brand-logo" src="" alt="REDYTELCA" class="brand-logo">
+            <img id="sidebar-brand-logo" src="branding-logo.php?slot=sidebar" alt="REDYTELCA" class="brand-logo">
         </div>
-        <span>REDYTELCA</span>
     </div>
-    <!-- El menú se pinta dinámicamente desde renderMenu() en app.js -->
     <div id="sidebar-nav"></div>
 </div>
 
 <main class="main-content">
     <header class="top-bar">
         <div class="top-left">
-            <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Alternar menú lateral">☰</button>
+            <button class="sidebar-toggle" aria-label="Alternar menú lateral">☰</button>
             <div>
                 <p id="page-eyebrow" class="eyebrow">Operación</p>
                 <h2 id="page-title">Panel de control</h2>
             </div>
         </div>
         <div class="top-actions">
+            <div class="notif-wrap" id="notif-wrap">
+                <button class="notif-bell" id="notif-bell" type="button" aria-label="Notificaciones" aria-haspopup="true" aria-expanded="false">
+                    🔔
+                    <span class="notif-bell-badge" id="notif-bell-badge" role="status" aria-live="polite" style="display:none;"></span>
+                </button>
+                <div class="notif-dropdown" id="notif-dropdown" style="display:none;" role="dialog" aria-label="Notificaciones">
+                    <div class="notif-dropdown-header">
+                        <span>Notificaciones</span>
+                        <button type="button" class="notif-link" id="notif-mark-all">Marcar todas como leídas</button>
+                    </div>
+                    <div class="notif-dropdown-list" id="notif-dropdown-list" role="log" aria-live="polite"></div>
+                    <div class="notif-dropdown-footer">
+                        <button type="button" class="notif-link" id="notif-view-all">Ver todas las notificaciones</button>
+                    </div>
+                </div>
+            </div>
             <div class="header-meta">
                 <span>Estado actual</span>
                 <strong id="dashboard-date"></strong>
             </div>
-            <button class="profile-button" onclick="toggleProfileMenu()">
+            <button class="profile-button">
                 <span id="profile-name-label">Admin</span>
                 <span class="profile-arrow">▾</span>
             </button>
@@ -76,13 +112,13 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
         </div>
     </header>
 
-    <div id="dash" class="page active">
+<div id="dash" class="page">
         <div class="dashboard-shell">
             <section class="dashboard-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
                 <div class="card chart-card">
                     <div class="card-title-row">
                         <h3>Total clientes</h3>
-                        <button class="table-action" type="button" onclick="showPage('clientes')">Ver clientes</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="clientes">Ver clientes</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Clientes registrados</p>
@@ -94,7 +130,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="card chart-card">
                     <div class="card-title-row">
                         <h3>Servicios activos</h3>
-                        <button class="table-action" type="button" onclick="showPage('clientes')">Ver servicios</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="servicios">Ver servicios</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Activos / total</p>
@@ -106,7 +142,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="card chart-card">
                     <div class="card-title-row">
                         <h3>Contratos</h3>
-                        <button class="table-action" type="button" onclick="showPage('contratos')">Ver contratos</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="contratos">Ver contratos</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Vigentes y vencidos</p>
@@ -118,7 +154,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="card chart-card">
                     <div class="card-title-row">
                         <h3>Tickets abiertos</h3>
-                        <button class="table-action" type="button" onclick="showPage('tickets', null)">Ver tickets</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="tickets">Ver tickets</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Sin cerrar</p>
@@ -130,7 +166,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="card chart-card">
                     <div class="card-title-row">
                         <h3>Tareas pendientes</h3>
-                        <button class="table-action" type="button" onclick="showPage('tareas', null)">Ver tareas</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="tareas">Ver tareas</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Pendientes</p>
@@ -142,7 +178,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="card chart-card">
                     <div class="card-title-row">
                         <h3>OLTs</h3>
-                        <button class="table-action" type="button" onclick="showPage('olts', null)">Ver OLTs</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="olts">Ver OLTs</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Resumen de infraestructura</p>
@@ -154,7 +190,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="card chart-card">
                     <div class="card-title-row">
                         <h3>NAPs</h3>
-                        <button class="table-action" type="button" onclick="showPage('naps', null)">Ver NAPs</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="naps">Ver NAPs</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Resumen de puertos</p>
@@ -166,7 +202,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="card chart-card border-red">
                     <div class="card-title-row">
                         <h3>Facturas vencidas</h3>
-                        <button class="table-action" type="button" onclick="showPage('facturas', null)">Ver facturas</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="facturas">Ver facturas</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Mora</p>
@@ -178,7 +214,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="card chart-card">
                     <div class="card-title-row">
                         <h3>Pagos pendientes</h3>
-                        <button class="table-action" type="button" onclick="showPage('pagos', null)">Ver pagos</button>
+                        <button class="table-action" type="button" data-action="goto" data-page="pagos">Ver pagos</button>
                     </div>
                     <div style="display:grid; gap:8px;">
                         <p class="stat-label">Por validar</p>
@@ -235,20 +271,10 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
         </div>
     </div>
 
-    <!-- MÓDULO Clientes: Alta + Listado unificados en un CRUD sobre grid dinámico.
-         CORRECCIÓN FASE 2.5 (index.html): client-modal ya NO contiene campos de
-         dirección/coordenadas/NAP (client-direccion, client-latitud,
-         client-longitud, client-nap). Esos campos fueron eliminados porque
-         app.js (guardarCliente(), toggleClientForm()) dejó de leerlos y
-         limpiarlos desde Fase 2.5 — dejarlos en el DOM sin uso real es ruido
-         visual engañoso: un operador vería inputs que aparentan guardar algo
-         pero cuyo valor nunca llega al backend. La dirección/NAP/coordenadas
-         ahora pertenecen exclusivamente al servicio (servicio-modal, más abajo),
-         gestionado desde la ficha del cliente. -->
     <div id="clientes" class="page">
         <div class="card">
             <div class="toolbar" data-toolbar="clientes">
-                <input id="search-client" class="search-box" type="text" placeholder="🔍 Buscar por Cédula o Nombre..." oninput="loadClientes(this.value, 1)">
+                <input id="search-client" class="search-box" type="text" placeholder="🔍 Buscar por Cédula, Nombre o Dirección..." oninput="loadClientes(this.value, 1)">
                 <button type="button" class="toolbar-btn" data-module="clientes" data-action="new" onclick="toggleClientForm()">Nuevo cliente</button>
                 <button type="button" class="toolbar-btn" data-module="clientes" data-action="edit" onclick="const clientId = getSelectedId('clientes'); if (clientId) editarCliente(clientId);">Editar</button>
                 <button type="button" class="toolbar-btn" data-module="clientes" data-action="delete" onclick="const clientId = getSelectedId('clientes'); if (clientId) eliminarCliente(clientId);">Eliminar</button>
@@ -269,8 +295,16 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                             <input id="client-telefono" type="text" placeholder="Teléfono">
                             <input id="client-correo" type="email" placeholder="Correo">
                         </div>
+                        <h4 style="margin:16px 0 8px; font-size:0.95rem; color:var(--text);">Dirección del cliente</h4>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+                            <input id="client-calle" type="text" placeholder="Calle">
+                            <input id="client-carrera" type="text" placeholder="Carrera">
+                            <input id="client-avenida" type="text" placeholder="Avenida">
+                            <input id="client-latitud" type="text" placeholder="Latitud (Ej. 10.48060000)">
+                            <input id="client-longitud" type="text" placeholder="Longitud (Ej. -66.90360000)">
+                        </div>
                         <p style="margin:12px 0 0; color:#64748b; font-size:0.9rem;">
-                            La dirección, NAP y coordenadas de instalación se gestionan por cada servicio del cliente (botón "Ficha" → "+ Añadir servicio").
+                            La dirección de <strong>instalación</strong> (por servicio, con su propia NAP y coordenadas) se gestiona en la ficha del cliente → "+ Añadir servicio". Aquí se registra la dirección <strong>del cliente</strong> (legal / fiscal).
                         </p>
                         <div style="display:flex; gap:8px; margin-top:12px;">
                             <button type="button" onclick="guardarCliente()" style="width:auto; padding:10px 14px;">Guardar cliente</button>
@@ -288,7 +322,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                             <th>Cédula</th>
                             <th>Teléfono</th>
                             <th>Correo</th>
-                            <th>Dirección</th>
+                            <th>Dirección del cliente</th>
                             <th>Servicios</th>
                         </tr>
                     </thead>
@@ -336,221 +370,578 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
         </div>
     </div>
 
-    <!-- MÓDULO Tareas: mismo patrón de grid que Clientes. El formulario
-         (task-form) es toggleable y sirve tanto para crear como para
-         editar; el listado ahora es una tabla real (task-list es el
-         <tbody>) en vez de tarjetas apiladas. -->
     <div id="tareas" class="page">
         <div class="card">
             <div class="toolbar" data-toolbar="tareas">
-                <span>Hoy</span>
-                <button type="button" class="toolbar-btn" data-module="tareas" data-action="new" onclick="toggleTaskForm()">Nueva tarea</button>
-                <button type="button" class="toolbar-btn" data-module="tareas" data-action="edit" onclick="const taskId = getSelectedId('tareas'); if (taskId) editarTarea(taskId);">Editar</button>
-                <button type="button" class="toolbar-btn" data-module="tareas" data-action="delete" onclick="const taskId = getSelectedId('tareas'); if (taskId) eliminarTarea(taskId);">Eliminar</button>
+                <input id="tareas-search" class="search-box" type="text" placeholder="🔍 Buscar tarea...">
+                <button type="button" class="toolbar-btn" data-toolbar="tareas" data-action="new">Nueva tarea</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tareas" data-action="edit" disabled>Editar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tareas" data-action="delete" disabled>Eliminar</button>
             </div>
-            <div id="task-modal" class="modal-overlay" style="display:none;">
-                <div class="modal-card">
-                    <div class="modal-header">
-                        <h3>Nueva tarea</h3>
-                        <button type="button" class="modal-close" onclick="toggleTaskForm(true)">×</button>
-                    </div>
-                    <form id="task-form" class="modal-form">
-                        <input id="task-id" type="hidden">
-                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
-                            <input id="task-title" type="text" placeholder="Título de la tarea" required>
-                            <select id="task-status">
-                                <option>Pendiente</option>
-                                <option>En curso</option>
-                                <option>Completada</option>
-                            </select>
-                            <select id="task-priority">
-                                <option>Alta</option>
-                                <option selected>Media</option>
-                                <option>Baja</option>
-                            </select>
-                            <select id="task-client"></select>
-                            <select id="task-user"></select>
-                        </div>
-                        <textarea id="task-description" placeholder="Descripción" style="margin-top:12px;"></textarea>
-                        <div style="display:flex; gap:8px; margin-top:12px;">
-                            <button type="button" onclick="guardarTarea()" style="width:auto; padding:10px 14px;">Guardar tarea</button>
-                            <button type="button" onclick="toggleTaskForm(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+
             <div class="table-wrap">
                 <table id="tareas-table">
                     <thead>
                         <tr>
                             <th>Título</th>
                             <th>Cliente</th>
-                            <th>Creado por</th>
+                            <th>Cédula</th>
+                            <th>Servicio</th>
+                            <th>Creador</th>
                             <th>Prioridad</th>
                             <th>Estado</th>
                         </tr>
                     </thead>
-                    <tbody id="task-list"></tbody>
+                    <tbody id="tareas-list"></tbody>
                 </table>
             </div>
-            <div id="tasks-pagination" class="pagination-row"></div>
+            <div id="tareas-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
+            <div id="tareas-pagination" class="pagination-row"></div>
         </div>
     </div>
 
-    <!-- MÓDULO Tickets: mismo patrón. data-ticket-status se movió del
-         antiguo .ticket-card a la fila <tr>, y setTicketsFilter() ahora
-         selecciona '#ticket-list tr' para no romper el filtrado por
-         pastillas (Abierto/En proceso/Cerrado). -->
     <div id="tickets" class="page">
         <div class="card">
             <div class="toolbar" data-toolbar="tickets">
                 <div class="filter-row" id="ticket-filters">
-                    <button class="filter-pill active" onclick="setTicketsFilter('Todos', this)">Todos</button>
-                    <button class="filter-pill" onclick="setTicketsFilter('Abierto', this)">Abierto</button>
-                    <button class="filter-pill" onclick="setTicketsFilter('En proceso', this)">En proceso</button>
-                    <button class="filter-pill" onclick="setTicketsFilter('Cerrado', this)">Cerrado</button>
+                    <button class="filter-pill active" data-ticket-filter="Todos">Todos</button>
+                    <button class="filter-pill" data-ticket-filter="Abierto">Abierto</button>
+                    <button class="filter-pill" data-ticket-filter="En proceso">En proceso</button>
+                    <button class="filter-pill" data-ticket-filter="Cerrado">Cerrado</button>
                 </div>
-                <button type="button" class="toolbar-btn" data-module="tickets" data-action="new" onclick="toggleTicketForm()">Nuevo ticket</button>
-                <button type="button" class="toolbar-btn" data-module="tickets" data-action="cerrar" onclick="abrirCierreTicket(getSelectedId('tickets'))" disabled>Cerrar ticket</button>
-                <button type="button" class="toolbar-btn" data-module="tickets" data-action="edit" onclick="const ticketId = getSelectedId('tickets'); if (ticketId) editarTicket(ticketId);">Editar</button>
-                <button type="button" class="toolbar-btn" data-module="tickets" data-action="delete" onclick="const ticketId = getSelectedId('tickets'); if (ticketId) eliminarTicket(ticketId);">Eliminar</button>
-                <button type="button" class="toolbar-btn" onclick="exportClosedTicketsPdf()">Exportar cerrados a PDF</button>
+                <input id="tickets-search" class="search-box" type="text" placeholder="🔍 Buscar ticket...">
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="new">Nuevo ticket</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="cerrar" disabled>Cerrar ticket</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="new-tarea" disabled>Nueva tarea</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="new-pedido" disabled>Nuevo pedido</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="edit" disabled>Editar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="delete" disabled>Eliminar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="export-pdf">Exportar cerrados a PDF</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="goto-categorias">Gestionar categorías</button>
+                <button type="button" class="toolbar-btn" data-toolbar="tickets" data-action="goto-sla">Gestionar SLA</button>
             </div>
+
             <div id="ticket-modal" class="modal-overlay" style="display:none;">
                 <div class="modal-card">
                     <div class="modal-header">
-                        <h3>Nuevo ticket</h3>
-                        <button type="button" class="modal-close" onclick="toggleTicketForm(true)">×</button>
+                        <h3 id="ticket-modal-title">Nuevo ticket</h3>
+                        <button type="button" class="modal-close" data-action="cancel-ticket">×</button>
                     </div>
                     <form id="ticket-form" class="modal-form">
                         <input id="ticket-id" type="hidden">
                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
                             <input id="ticket-subject" type="text" placeholder="Asunto del ticket" required>
                             <select id="ticket-status">
-                                <option>Abierto</option>
-                                <option>En proceso</option>
-                                <option>Cerrado</option>
+                                <option value="Abierto">Abierto</option>
+                                <option value="En proceso">En proceso</option>
+                                <option value="Cerrado">Cerrado</option>
                             </select>
                             <select id="ticket-priority">
-                                <option>Alta</option>
-                                <option selected>Media</option>
-                                <option>Baja</option>
+                                <option value="Alta">Alta</option>
+                                <option value="Media" selected>Media</option>
+                                <option value="Baja">Baja</option>
                             </select>
                             <select id="ticket-client"></select>
-                            <select id="ticket-user"></select>
+                            <select id="ticket-servicio"></select>
+                            <select id="ticket-categoria"></select>
                         </div>
                         <textarea id="ticket-description" placeholder="Descripción" style="margin-top:12px;"></textarea>
                         <div style="display:flex; gap:8px; margin-top:12px;">
-                            <button type="button" onclick="guardarTicket()" style="width:auto; padding:10px 14px;">Guardar ticket</button>
-                            <button type="button" onclick="toggleTicketForm(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                            <button type="button" data-action="save-ticket" style="width:auto; padding:10px 14px;">Guardar ticket</button>
+                            <button type="button" data-action="cancel-ticket" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
                         </div>
                     </form>
                 </div>
             </div>
+
             <div id="close-ticket-modal" class="modal-overlay" style="display:none;">
                 <div class="modal-card">
                     <div class="modal-header">
                         <h3>Cerrar ticket</h3>
-                        <button type="button" class="modal-close" onclick="toggleCloseTicketModal(true)">×</button>
+                        <button type="button" class="modal-close" data-action="cancel-close-ticket">×</button>
                     </div>
                     <input id="close-ticket-id" type="hidden">
                     <p class="modal-help">Describe brevemente qué se realizó para resolver este ticket.</p>
                     <textarea id="close-ticket-details" rows="6" placeholder="Detalle del trabajo realizado, solución aplicada y observaciones..."></textarea>
                     <div style="display:flex; gap:8px; margin-top:12px;">
-                        <button type="button" onclick="confirmarCierreTicket()" style="width:auto; padding:10px 14px;">Cerrar ticket</button>
-                        <button type="button" onclick="toggleCloseTicketModal(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                        <button type="button" data-action="confirm-close-ticket" style="width:auto; padding:10px 14px;">Cerrar ticket</button>
+                        <button type="button" data-action="cancel-close-ticket" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
                     </div>
                 </div>
             </div>
+
+            <div id="ticket-respuestas-modal" class="modal-overlay" style="display:none;">
+                <div class="modal-card modal-lg">
+                    <div class="modal-header">
+                        <h3 id="ticket-respuestas-title">Hilo de respuestas</h3>
+                        <button type="button" class="modal-close" data-action="close-respuestas-modal">×</button>
+                    </div>
+                    <div id="ticket-respuestas-list" style="max-height:340px; overflow-y:auto; padding:8px; background:#f8fafc; border-radius:10px; border:1px solid var(--border);"></div>
+                    <div style="margin-top:12px;">
+                        <textarea id="ticket-respuesta-mensaje" placeholder="Escribe una respuesta..." style="min-height:80px;"></textarea>
+                        <input id="ticket-respuesta-id-ticket" type="hidden">
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <button type="button" data-action="save-respuesta" style="width:auto; padding:10px 14px;">Enviar respuesta</button>
+                            <button type="button" data-action="close-respuestas-modal" style="width:auto; padding:10px 14px; background:#64748b;">Cerrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="table-wrap">
                 <table id="tickets-table">
                     <thead>
                         <tr>
                             <th>Asunto</th>
                             <th>Cliente</th>
-                            <th>Creado por</th>
+                            <th>Cédula</th>
+                            <th>Categoría</th>
                             <th>Prioridad</th>
                             <th>Estado</th>
+                            <th>SLA vence</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="ticket-list"></tbody>
                 </table>
             </div>
+            <div id="tickets-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
             <div id="tickets-pagination" class="pagination-row"></div>
+        </div>
+    </div>
+
+    <div id="pedidos" class="page">
+        <div class="card">
+            <div class="toolbar" data-toolbar="pedidos">
+                <input id="pedidos-search" class="search-box" type="text" placeholder="🔍 Buscar pedido...">
+                <button type="button" class="toolbar-btn" data-toolbar="pedidos" data-action="new">Nuevo pedido</button>
+                <button type="button" class="toolbar-btn" data-toolbar="pedidos" data-action="edit" disabled>Editar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="pedidos" data-action="delete" disabled>Eliminar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="pedidos" data-action="asignar" disabled>Asignar técnico</button>
+                <button type="button" class="toolbar-btn" data-toolbar="pedidos" data-action="materiales" disabled>Materiales</button>
+                <button type="button" class="toolbar-btn" data-toolbar="pedidos" data-action="historial" disabled>Historial</button>
+            </div>
+
+            <div class="table-wrap">
+                <table id="pedidos-table">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Cédula</th>
+                            <th>Servicio</th>
+                            <th>Equipo</th>
+                            <th>Tipo</th>
+                            <th>Técnico</th>
+                            <th>Prioridad</th>
+                            <th>Estado</th>
+                            <th>Fecha programada</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pedidos-list"></tbody>
+                </table>
+            </div>
+            <div id="pedidos-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
+            <div id="pedidos-pagination" class="pagination-row"></div>
         </div>
     </div>
 
     <div id="mapa" class="page">
         <div class="card map-card">
             <div class="map-controls-simple">
-                <select id="map-filter-router" onchange="onMapFilterChange()">
+                <select id="map-filter-router">
                     <option value="">Router (todos)</option>
                 </select>
-                <select id="map-filter-emisor" onchange="onMapFilterChange()">
+                <select id="map-filter-emisor">
                     <option value="">Emisor (todos)</option>
                 </select>
-                <select id="map-filter-ubicacion" onchange="onMapFilterChange()">
+                <select id="map-filter-ubicacion">
                     <option value="">Ubicación (todas)</option>
                 </select>
-                <button type="button" onclick="onMapFilterChange()">Filtrar</button>
+                <button type="button" data-action="apply-filters">Filtrar</button>
                 <span id="map-filters-active" class="filter-pill active" style="display:none;">Filtro activo</span>
-                <button type="button" onclick="limpiarFiltrosMapa()" style="background:#64748b;">Limpiar filtros</button>
+                <button type="button" data-action="clear-filters" style="background:#64748b;">Limpiar filtros</button>
             </div>
             <div id="map-panel" class="map-panel">
                 <div id="map-embed" class="map-embed" title="Mapa de REDYTELCA"></div>
                 <div class="map-legend">
-                    <div class="map-legend-item">📍 Nodo</div>
-                    <div class="map-legend-item">🖧 Router / OLT</div>
-                    <div class="map-legend-item">🔌 Emisor / NAP</div>
-                    <div class="map-legend-item">👤 Clientes</div>
+                    <div class="map-legend-item"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#3b82f6;color:#fff;font-weight:700;text-align:center;line-height:14px;font-size:9px;">N</span> Nodo</div>
+                    <div class="map-legend-item"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#16a34a;color:#fff;font-weight:700;text-align:center;line-height:14px;font-size:9px;">O</span> OLT (en nodo)</div>
+                    <div class="map-legend-item"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#f59e0b;color:#fff;font-weight:700;text-align:center;line-height:14px;font-size:9px;">P</span> NAP</div>
+                    <div class="map-legend-item"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ec4899;color:#fff;font-weight:700;text-align:center;line-height:14px;font-size:9px;">S</span> Servicio (instalación)</div>
+                    <div class="map-legend-item"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#a855f7;color:#fff;font-weight:700;text-align:center;line-height:14px;font-size:9px;">C</span> Cliente (fiscal)</div>
                 </div>
                 <div id="map-item-list" class="map-item-panel"></div>
             </div>
         </div>
     </div>
 
-    <!-- MÓDULO NUEVO: Reportes -->
     <div id="reportes" class="page">
         <div class="card">
             <div class="card-title-row">
-                <h3>Resumen operativo</h3>
-                <button class="table-action" onclick="renderReportes()">Actualizar reporte</button>
+                <h3>Reporte operativo</h3>
+                <span id="reportes-rango" style="font-size:0.9rem; color:#64748b;">—</span>
             </div>
-            <section class="stats-grid">
-                <div class="stat-card border-blue">
-                    <div>
-                        <p class="stat-label">Clientes registrados</p>
-                        <h2 id="report-total-clientes">0</h2>
-                    </div>
+
+            <form id="reportes-range-form" class="toolbar" data-toolbar="reportes" style="margin-top:12px; align-items:flex-end;">
+                <div>
+                    <label for="reportes-desde" style="display:block; font-size:0.85rem; color:#64748b; margin-bottom:4px;">Desde</label>
+                    <input id="reportes-desde" type="date" style="width:auto;">
                 </div>
-                <div class="stat-card border-yellow">
-                    <div>
-                        <p class="stat-label">Tareas pendientes</p>
-                        <h2 id="report-tareas-pendientes">0</h2>
-                    </div>
+                <div>
+                    <label for="reportes-hasta" style="display:block; font-size:0.85rem; color:#64748b; margin-bottom:4px;">Hasta</label>
+                    <input id="reportes-hasta" type="date" style="width:auto;">
                 </div>
+                <button type="button" class="toolbar-btn" data-action="apply-range">Aplicar</button>
+                <button type="button" class="toolbar-btn" data-action="current-month" style="background:#64748b;">Mes actual</button>
+                <button type="button" class="toolbar-btn" data-action="show-all" style="background:#0f766e;">Ver todo</button>
+                <button type="button" class="toolbar-btn" data-action="export-all" style="background:#7c3aed; margin-left:auto;">Exportar reporte completo a CSV</button>
+            </form>
+            <p style="margin:8px 0 0; font-size:0.85rem; color:#64748b;">
+                Sin fechas: se muestran <strong>todos</strong> los registros. Con fechas: se filtra por el rango.
+                El bloque de facturación suma: <strong>Facturado = Cobrado aplicado + Pendiente</strong>.
+                "Pagos a cuenta" (pagos sin factura asociada) es un indicador <strong>independiente</strong>.
+            </p>
+        </div>
+
+        <div class="card">
+            <div class="card-title-row">
+                <h3>Indicadores de facturación</h3>
+                <span style="font-size:0.85rem; color:#64748b;">Facturado = Cobrado aplicado + Pendiente</span>
+            </div>
+            <section class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
                 <div class="stat-card border-green">
                     <div>
-                        <p class="stat-label">Tareas completadas</p>
-                        <h2 id="report-tareas-completadas">0</h2>
+                        <p class="stat-label">Facturado (USD)</p>
+                        <h2 id="report-facturado-usd">$0.00</h2>
+                    </div>
+                </div>
+                <div class="stat-card border-blue">
+                    <div>
+                        <p class="stat-label">Cobrado aplicado (USD)</p>
+                        <h2 id="report-cobrado-aplicado-usd">$0.00</h2>
                     </div>
                 </div>
                 <div class="stat-card border-red">
                     <div>
-                        <p class="stat-label">Tickets abiertos</p>
-                        <h2 id="report-tickets-abiertos">0</h2>
+                        <p class="stat-label">Pendiente de cobro (USD)</p>
+                        <h2 id="report-pendiente-usd">$0.00</h2>
                     </div>
                 </div>
             </section>
         </div>
+
         <div class="card">
             <div class="card-title-row">
-                <h3>Tickets por prioridad</h3>
-                <span>Vista rápida</span>
+                <h3>Pagos a cuenta</h3>
+                <span style="font-size:0.85rem; color:#64748b;">Pagos validados sin factura asociada (indicador independiente)</span>
             </div>
-            <div id="report-tickets-prioridad" class="summary-metrics"></div>
+            <section class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="stat-card border-yellow">
+                    <div>
+                        <p class="stat-label">Pagos a cuenta (USD)</p>
+                        <h2 id="report-pagos-a-cuenta-usd">$0.00</h2>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="card">
+            <div class="card-title-row">
+                <h3>Indicadores de soporte</h3>
+            </div>
+            <section class="stats-grid" style="grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="stat-card border-yellow">
+                    <div>
+                        <p class="stat-label">Tickets (creados / abiertos)</p>
+                        <h2 id="report-tickets-resumen">0 / 0</h2>
+                    </div>
+                </div>
+                <div class="stat-card border-yellow">
+                    <div>
+                        <p class="stat-label">Tareas (creadas / pendientes)</p>
+                        <h2 id="report-tareas-resumen">0 / 0</h2>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="card">
+            <div class="card-title-row">
+                <h3>Facturas</h3>
+                <button type="button" class="table-action" data-action="export-facturas">Exportar CSV</button>
+            </div>
+            <div class="table-wrap">
+                <table id="report-facturas-table">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Cédula</th>
+                            <th>Periodo</th>
+                            <th>Monto USD</th>
+                            <th>Estado</th>
+                            <th>Vencimiento</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-facturas-list"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title-row">
+                <h3>Pagos</h3>
+                <button type="button" class="table-action" data-action="export-pagos">Exportar CSV</button>
+            </div>
+            <div class="table-wrap">
+                <table id="report-pagos-table">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Cédula</th>
+                            <th>Factura</th>
+                            <th>Monto USD</th>
+                            <th>Fecha de pago</th>
+                            <th>Método</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-pagos-list"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title-row">
+                <h3>Tickets</h3>
+                <button type="button" class="table-action" data-action="export-tickets">Exportar CSV</button>
+            </div>
+            <div class="table-wrap">
+                <table id="report-tickets-table">
+                    <thead>
+                        <tr>
+                            <th>Asunto</th>
+                            <th>Cliente</th>
+                            <th>Cédula</th>
+                            <th>Categoría</th>
+                            <th>Prioridad</th>
+                            <th>Estado</th>
+                            <th>Creado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-tickets-list"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title-row">
+                <h3>Tareas</h3>
+                <button type="button" class="table-action" data-action="export-tareas">Exportar CSV</button>
+            </div>
+            <div class="table-wrap">
+                <table id="report-tareas-table">
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Cliente</th>
+                            <th>Cédula</th>
+                            <th>Prioridad</th>
+                            <th>Estado</th>
+                            <th>Creado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-tareas-list"></tbody>
+                </table>
+            </div>
         </div>
     </div>
+
+    <div id="categorias-ticket" class="page">
+        <div class="card">
+            <div class="toolbar" data-toolbar="categorias-ticket">
+                <input id="categorias-ticket-search" class="search-box" type="text" placeholder="🔍 Buscar categoría...">
+                <button type="button" class="toolbar-btn" data-toolbar="categorias-ticket" data-action="new">Nueva categoría</button>
+                <button type="button" class="toolbar-btn" data-toolbar="categorias-ticket" data-action="edit" disabled>Editar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="categorias-ticket" data-action="delete" disabled>Eliminar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="categorias-ticket" data-action="back-to-tickets">← Volver a Tickets</button>
+            </div>
+            <div id="categoria-modal" class="modal-overlay" style="display:none;">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h3 id="categoria-modal-title">Nueva categoría</h3>
+                        <button type="button" class="modal-close" data-action="cancel-categoria">×</button>
+                    </div>
+                    <form id="categoria-form" class="modal-form">
+                        <input id="categoria-id" type="hidden">
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                            <input id="categoria-nombre" type="text" placeholder="Nombre" required>
+                            <input id="categoria-color" type="color" value="#104aa8" style="height:44px; padding:4px;">
+                            <select id="categoria-activa">
+                                <option value="1">Activa</option>
+                                <option value="0">Inactiva</option>
+                            </select>
+                        </div>
+                        <textarea id="categoria-descripcion" placeholder="Descripción (opcional)" style="margin-top:12px;"></textarea>
+                        <div style="display:flex; gap:8px; margin-top:12px;">
+                            <button type="button" data-action="save-categoria" style="width:auto; padding:10px 14px;">Guardar categoría</button>
+                            <button type="button" data-action="cancel-categoria" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table id="categorias-ticket-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Color</th>
+                            <th>Activa</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categorias-ticket-list"></tbody>
+                </table>
+            </div>
+            <div id="categorias-ticket-pagination" class="pagination-row"></div>
+        </div>
+    </div>
+
+    <div id="sla-definiciones" class="page">
+        <div class="card">
+            <div class="toolbar" data-toolbar="sla-definiciones">
+                <input id="sla-definiciones-search" class="search-box" type="text" placeholder="🔍 Buscar definición SLA...">
+                <button type="button" class="toolbar-btn" data-toolbar="sla-definiciones" data-action="new">Nueva definición</button>
+                <button type="button" class="toolbar-btn" data-toolbar="sla-definiciones" data-action="edit" disabled>Editar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="sla-definiciones" data-action="delete" disabled>Eliminar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="sla-definiciones" data-action="back-to-tickets">← Volver a Tickets</button>
+            </div>
+            <div id="sla-modal" class="modal-overlay" style="display:none;">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h3 id="sla-modal-title">Nueva definición SLA</h3>
+                        <button type="button" class="modal-close" data-action="cancel-sla">×</button>
+                    </div>
+                    <form id="sla-form" class="modal-form">
+                        <input id="sla-id" type="hidden">
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                            <select id="sla-categoria"></select>
+                            <select id="sla-prioridad">
+                                <option value="Alta">Alta</option>
+                                <option value="Media" selected>Media</option>
+                                <option value="Baja">Baja</option>
+                            </select>
+                            <input id="sla-horas-respuesta" type="number" min="1" max="999" placeholder="Horas de respuesta" required>
+                            <input id="sla-horas-resolucion" type="number" min="1" max="999" placeholder="Horas de resolución" required>
+                        </div>
+                        <textarea id="sla-descripcion" placeholder="Descripción (opcional)" style="margin-top:12px;"></textarea>
+                        <div style="display:flex; gap:8px; margin-top:12px;">
+                            <button type="button" data-action="save-sla" style="width:auto; padding:10px 14px;">Guardar definición</button>
+                            <button type="button" data-action="cancel-sla" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table id="sla-definiciones-table">
+                    <thead>
+                        <tr>
+                            <th>Categoría</th>
+                            <th>Prioridad</th>
+                            <th>Horas respuesta</th>
+                            <th>Horas resolución</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sla-definiciones-list"></tbody>
+                </table>
+            </div>
+            <div id="sla-definiciones-pagination" class="pagination-row"></div>
+        </div>
+    </div>
+
+    <div id="auditoria" class="page">
+        <div class="card">
+            <div class="toolbar" data-toolbar="auditoria">
+                <input id="auditoria-tabla" type="text" class="search-box" placeholder="Tabla (ej. pagos, clientes, facturas)">
+                <select id="auditoria-accion" style="width:auto;">
+                    <option value="">Todas las acciones</option>
+                    <option value="INSERT">INSERT</option>
+                    <option value="UPDATE">UPDATE</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="LOGIN">LOGIN</option>
+                    <option value="LOGOUT">LOGOUT</option>
+                    <option value="LOGIN_FALLIDO">LOGIN_FALLIDO</option>
+                </select>
+                <input id="auditoria-desde" type="date" title="Desde" style="width:auto;">
+                <input id="auditoria-hasta" type="date" title="Hasta" style="width:auto;">
+                <button type="button" class="toolbar-btn" data-toolbar="auditoria" data-action="apply-filters">Aplicar</button>
+                <button type="button" class="toolbar-btn" data-toolbar="auditoria" data-action="clear-filters" style="background:#64748b;">Limpiar</button>
+            </div>
+
+            <div id="auditoria-detail-modal" class="modal-overlay" style="display:none;">
+                <div class="modal-card modal-lg">
+                    <div class="modal-header">
+                        <h3 id="auditoria-detail-title">Detalle del registro</h3>
+                        <button type="button" class="modal-close" data-action="close-auditoria-detail">×</button>
+                    </div>
+                    <div id="auditoria-detail-content"></div>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table id="auditoria-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Acción</th>
+                            <th>Tabla</th>
+                            <th>ID registro</th>
+                            <th>Actor</th>
+                            <th>IP</th>
+                            <th>Valores</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditoria-list"></tbody>
+                </table>
+            </div>
+            <div id="auditoria-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
+            <div id="auditoria-pagination" class="pagination-row"></div>
+        </div>
+    </div>
+
+    <div id="notificaciones" class="page">
+        <div class="card">
+            <div class="toolbar" data-toolbar="notificaciones">
+                <input id="notificaciones-search" class="search-box" type="text" placeholder="🔍 Buscar notificación...">
+                <select id="notificaciones-estado" style="width:auto;">
+                    <option value="">Todas</option>
+                    <option value="no leido">No leídas</option>
+                    <option value="leido">Leídas</option>
+                </select>
+                <button type="button" class="toolbar-btn" data-toolbar="notificaciones" data-action="mark-all">Marcar todas como leídas</button>
+            </div>
+
+            <div class="table-wrap">
+                <table id="notificaciones-table">
+                    <thead>
+                        <tr>
+                            <th>Estado</th>
+                            <th>Título</th>
+                            <th>Mensaje</th>
+                            <th>Tipo</th>
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody id="notificaciones-list"></tbody>
+                </table>
+            </div>
+            <div id="notificaciones-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
+            <div id="notificaciones-pagination" class="pagination-row"></div>
+        </div>
+    </div>
+
 <div id="nodos" class="page">
 <div class="card">
 <div class="toolbar" data-toolbar="nodos">
@@ -702,47 +1093,10 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 <div id="equipos" class="page">
 <div class="card">
 <div class="toolbar" data-toolbar="equipos">
-<input id="equipos-search" class="search-box" type="text" placeholder="🔍 Buscar equipo..." oninput="renderEquiposPage(1)">
+<input id="equipos-search" class="search-box" type="text" placeholder="🔍 Buscar por MAC, NAP o cédula del cliente...">
 <button type="button" class="toolbar-btn" data-module="equipos" data-action="new" onclick="toggleEquipoForm()">Nuevo equipo</button>
 <button type="button" class="toolbar-btn" data-module="equipos" data-action="edit" onclick="const equipoId = getSelectedId('equipos'); if (equipoId) editarEquipo(equipoId);">Editar</button>
 <button type="button" class="toolbar-btn" data-module="equipos" data-action="delete" onclick="const equipoId = getSelectedId('equipos'); if (equipoId) eliminarEquipo(equipoId);">Eliminar</button>
-</div>
-<div id="equipo-modal" class="modal-overlay" style="display:none;">
-<div class="modal-card">
-<div class="modal-header">
-<h3>Datos del equipo</h3>
-<button type="button" class="modal-close" onclick="toggleEquipoForm(true)">×</button>
-</div>
-<form id="equipo-form" class="modal-form">
-<input id="equipo-id" type="hidden">
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
-<select id="equipo-tipo">
-<option value="ONU">ONU</option>
-<option value="ONT">ONT</option>
-<option value="ROUTER">ROUTER</option>
-</select>
-<input id="equipo-marca" type="text" placeholder="Marca">
-<input id="equipo-modelo" type="text" placeholder="Modelo">
-<input id="equipo-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF">
-<input id="equipo-puerto" type="number" placeholder="Número de puerto" min="1">
-<select id="equipo-estado">
-<option value="operativo">Operativo</option>
-<option value="averiado">Averiado</option>
-<option value="stock">Stock</option>
-</select>
-<select id="equipo-propiedad">
-<option value="empresa">Empresa (comodato)</option>
-<option value="cliente">Cliente (propio)</option>
-</select>
-<select id="equipo-nap"></select>
-<select id="equipo-servicio"></select>
-</div>
-<div style="display:flex; gap:8px; margin-top:12px;">
-<button type="button" onclick="guardarEquipo()" style="width:auto; padding:10px 14px;">Guardar equipo</button>
-<button type="button" onclick="toggleEquipoForm(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
-</div>
-</form>
-</div>
 </div>
 <div class="table-wrap">
 <table id="equipos-table">
@@ -767,16 +1121,16 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 <div id="facturas" class="page">
 <div class="card">
 <div class="toolbar" data-toolbar="facturas">
-<input id="facturas-search" class="search-box" type="text" placeholder="🔍 Buscar factura..." oninput="renderFacturasPage(1)">
-<button type="button" class="toolbar-btn" data-module="facturas" data-action="new" onclick="toggleFacturaForm()">Nueva factura</button>
-<button type="button" class="toolbar-btn" data-module="facturas" data-action="edit" onclick="const facturaId = getSelectedId('facturas'); if (facturaId) editarFactura(facturaId);">Editar</button>
-<button type="button" class="toolbar-btn" data-module="facturas" data-action="delete" onclick="const facturaId = getSelectedId('facturas'); if (facturaId) eliminarFactura(facturaId);">Eliminar</button>
+<input id="facturas-search" class="search-box" type="text" placeholder="🔍 Buscar por cédula, nombre, periodo...">
+<button type="button" class="toolbar-btn" data-module="facturas" data-action="new">Nueva factura</button>
+<button type="button" class="toolbar-btn" data-module="facturas" data-action="edit" disabled>Editar</button>
+<button type="button" class="toolbar-btn" data-module="facturas" data-action="delete" disabled>Eliminar</button>
 </div>
 <div id="factura-modal" class="modal-overlay" style="display:none;">
 <div class="modal-card">
 <div class="modal-header">
 <h3>Datos de la factura</h3>
-<button type="button" class="modal-close" onclick="toggleFacturaForm(true)">×</button>
+<button type="button" class="modal-close">×</button>
 </div>
 <form id="factura-form" class="modal-form">
 <input id="factura-id" type="hidden">
@@ -786,12 +1140,12 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
 <select id="factura-servicio"></select>
 <input id="factura-periodo" type="text" placeholder="Periodo (Ej. 2026-07)">
-<input id="factura-monto" type="number" step="0.01" min="0" placeholder="Monto en USD (precio del plan)" oninput="updateFacturaEquivalenteBs()">
-<select id="factura-moneda" onchange="updateFacturaEquivalenteBs()">
+<input id="factura-monto" type="number" step="0.01" min="0" placeholder="Monto en USD (precio del plan)">
+<select id="factura-moneda">
 <option value="USD" selected>USD</option>
 <option value="VES">VES</option>
 </select>
-<input id="factura-tasa-cambio" type="number" step="0.0001" min="0" placeholder="Tasa BCV (Bs/USD) — solo si VES" oninput="updateFacturaEquivalenteBs()">
+<input id="factura-tasa-cambio" type="number" step="0.0001" min="0" placeholder="Tasa BCV (Bs/USD) — solo si VES">
 <span id="factura-equivalente-bs" style="font-size:0.9rem; color:#64748b; align-self:center;"></span>
 <input id="factura-fecha-emision" type="date" placeholder="Fecha de emisión">
 <input id="factura-fecha-vencimiento" type="date" placeholder="Fecha de vencimiento">
@@ -804,10 +1158,34 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 </select>
 </div>
 <div style="display:flex; gap:8px; margin-top:12px;">
-<button type="button" onclick="guardarFactura()" style="width:auto; padding:10px 14px;">Guardar factura</button>
-<button type="button" onclick="toggleFacturaForm(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+<button type="button" data-action="save-factura" style="width:auto; padding:10px 14px;">Guardar factura</button>
+<button type="button" data-action="cancel-factura" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
 </div>
 </form>
+</div>
+</div>
+<div id="factura-lineas-modal" class="modal-overlay" style="display:none;">
+<div class="modal-card modal-lg">
+<div class="modal-header">
+<h3 id="factura-lineas-title">Líneas de factura</h3>
+<button type="button" class="modal-close" data-action="close-lineas-modal">×</button>
+</div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Concepto</th>
+<th>Cantidad</th>
+<th>P. Unitario</th>
+<th>Monto</th>
+<th>Impuesto</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody id="factura-lineas-list"></tbody>
+</table>
+</div>
+<div id="factura-lineas-total" style="margin-top:16px; padding:12px; background:#f8fafc; border-radius:10px; font-weight:600; text-align:right;"></div>
 </div>
 </div>
 <div class="table-wrap">
@@ -815,34 +1193,37 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 <thead>
 <tr>
 <th>Cliente</th>
+<th>Cédula</th>
 <th>Periodo</th>
 <th>Monto</th>
 <th>Pagado</th>
 <th>Vencimiento</th>
 <th>Estado</th>
+<th>Acciones</th>
 </tr>
 </thead>
 <tbody id="facturas-list"></tbody>
 </table>
 </div>
+<div id="facturas-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
 <div id="facturas-pagination" class="pagination-row"></div>
 </div>
 </div>
 <div id="pagos" class="page">
 <div class="card">
 <div class="toolbar" data-toolbar="pagos">
-<input id="pagos-search" class="search-box" type="text" placeholder="🔍 Buscar pago..." oninput="renderPagosPage(1)">
-<button type="button" class="toolbar-btn" data-module="pagos" data-action="new" onclick="togglePagoForm()">Registrar pago</button>
-<button type="button" class="toolbar-btn" data-module="pagos" data-action="validar" onclick="actualizarEstadoPago(getSelectedId('pagos'), 'validado')" disabled>Validar</button>
-<button type="button" class="toolbar-btn" data-module="pagos" data-action="rechazar" onclick="actualizarEstadoPago(getSelectedId('pagos'), 'rechazado')" disabled>Rechazar</button>
-<button type="button" class="toolbar-btn" data-module="pagos" data-action="edit" onclick="const pagoId = getSelectedId('pagos'); if (pagoId) editarPago(pagoId);">Editar</button>
-<button type="button" class="toolbar-btn" data-module="pagos" data-action="delete" onclick="const pagoId = getSelectedId('pagos'); if (pagoId) eliminarPago(pagoId);">Eliminar</button>
+<input id="pagos-search" class="search-box" type="text" placeholder="🔍 Buscar pago...">
+<button type="button" class="toolbar-btn" data-module="pagos" data-action="new">Registrar pago</button>
+<button type="button" class="toolbar-btn" data-module="pagos" data-action="validar" disabled>Validar</button>
+<button type="button" class="toolbar-btn" data-module="pagos" data-action="rechazar" disabled>Rechazar</button>
+<button type="button" class="toolbar-btn" data-module="pagos" data-action="edit" disabled>Editar</button>
+<button type="button" class="toolbar-btn" data-module="pagos" data-action="delete" disabled>Eliminar</button>
 </div>
 <div id="pago-modal" class="modal-overlay" style="display:none;">
 <div class="modal-card">
 <div class="modal-header">
 <h3>Datos del pago</h3>
-<button type="button" class="modal-close" onclick="togglePagoForm(true)">×</button>
+<button type="button" class="modal-close" data-action="close-pago-modal">×</button>
 </div>
 <form id="pago-form" class="modal-form">
 <input id="pago-id" type="hidden">
@@ -860,6 +1241,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 <option value="VES">VES (bolívares al cambio BCV)</option>
 </select>
 <input id="pago-tasa-cambio" type="number" step="0.0001" min="0" placeholder="Tasa BCV (Bs/USD) — solo si VES">
+<small id="pago-tasa-factura-ref" style="color:#64748b; font-size:0.8rem; align-self:center;"></small>
 <input id="pago-fecha" type="datetime-local" placeholder="Fecha de pago">
 <select id="pago-metodo">
 <option value="">Método de pago</option>
@@ -867,8 +1249,8 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 <input id="pago-referencia" type="text" placeholder="Referencia bancaria">
 </div>
 <div style="display:flex; gap:8px; margin-top:12px;">
-<button type="button" onclick="guardarPago()" style="width:auto; padding:10px 14px;">Guardar pago</button>
-<button type="button" onclick="togglePagoForm(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+<button type="button" data-action="save-pago" style="width:auto; padding:10px 14px;">Guardar pago</button>
+<button type="button" data-action="cancel-pago" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
 </div>
 </form>
 </div>
@@ -878,6 +1260,8 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 <thead>
 <tr>
 <th>Cliente</th>
+<th>Cédula</th>
+<th>Servicio</th>
 <th>Factura</th>
 <th>Monto</th>
 <th>Fecha</th>
@@ -888,138 +1272,126 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 <tbody id="pagos-list"></tbody>
 </table>
 </div>
+<div id="pagos-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
 <div id="pagos-pagination" class="pagination-row"></div>
 </div>
 </div>
 <div id="planes" class="page">
-<div class="card">
-<div class="toolbar" data-toolbar="planes">
-<input id="planes-search" class="search-box" type="text" placeholder="🔍 Buscar plan..." oninput="renderPlanesPage(1)">
-<button type="button" class="toolbar-btn" data-module="planes" data-action="new" onclick="togglePlanForm()">Nuevo plan</button>
-<button type="button" class="toolbar-btn" data-module="planes" data-action="edit" onclick="const planId = getSelectedId('planes'); if (planId) editarPlan(planId);">Editar</button>
-<button type="button" class="toolbar-btn" data-module="planes" data-action="delete" onclick="const planId = getSelectedId('planes'); if (planId) eliminarPlan(planId);">Eliminar</button>
-</div>
-<div id="plan-modal" class="modal-overlay" style="display:none;">
-<div class="modal-card">
-<div class="modal-header">
-<h3>Datos del plan</h3>
-<button type="button" class="modal-close" onclick="togglePlanForm(true)">×</button>
-</div>
-<form id="plan-form" class="modal-form">
-<input id="plan-id" type="hidden">
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
-<input id="plan-nombre" type="text" placeholder="Nombre del plan (Ej. Plan Hogar 20 Mbps)">
-<input id="plan-velocidad-bajada" type="number" step="0.01" min="0.01" placeholder="Velocidad bajada (Mbps)">
-<input id="plan-velocidad-subida" type="number" step="0.01" min="0.01" placeholder="Velocidad subida (Mbps)">
-<select id="plan-tecnologia">
-    <option value="FTTH" selected>FTTH</option>
-    <option value="HFC">HFC</option>
-    <option value="WISP">WISP</option>
-    <option value="OTRO">OTRO</option>
-</select>
-<input id="plan-precio" type="number" step="0.01" min="0" placeholder="Precio mensual">
-<input id="plan-moneda" type="text" placeholder="Moneda (Ej. USD)" value="USD">
-</div>
-<div style="display:flex; gap:8px; margin-top:12px;">
-<button type="button" onclick="guardarPlan()" style="width:auto; padding:10px 14px;">Guardar plan</button>
-<button type="button" onclick="togglePlanForm(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
-</div>
-</form>
-</div>
-</div>
-<div class="table-wrap">
-<table id="planes-table">
-<thead>
-    <tr>
-        <th>Nombre</th>
-        <th>Velocidad</th>
-        <th>Precio</th>
-        <th>Moneda</th>
-        <th>Tecnología</th>
-        <th>Servicios activos</th>
-    </tr>
-</thead>
-<tbody id="planes-list"></tbody>
-</table>
-</div>
-<div id="planes-pagination" class="pagination-row"></div>
-</div>
+    <div class="card">
+        <div class="toolbar" data-toolbar="planes">
+            <input id="planes-search" class="search-box" type="text" placeholder="🔍 Buscar plan...">
+            <button type="button" class="toolbar-btn" data-module="planes" data-action="new">Nuevo plan</button>
+            <button type="button" class="toolbar-btn" data-module="planes" data-action="edit">Editar</button>
+            <button type="button" class="toolbar-btn" data-module="planes" data-action="delete">Eliminar</button>
+        </div>
+        <div id="plan-modal" class="modal-overlay" style="display:none;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>Datos del plan</h3>
+                    <button type="button" class="modal-close" data-action="close-plan-modal">×</button>
+                </div>
+                <form id="plan-form" class="modal-form">
+                    <input id="plan-id" type="hidden">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                        <input id="plan-nombre" type="text" placeholder="Nombre del plan (Ej. Plan Hogar 20 Mbps)">
+                        <input id="plan-velocidad-bajada" type="number" step="0.01" min="0.01" placeholder="Velocidad bajada (Mbps)">
+                        <input id="plan-velocidad-subida" type="number" step="0.01" min="0.01" placeholder="Velocidad subida (Mbps)">
+                        <select id="plan-tecnologia">
+                            <option value="FTTH" selected>FTTH</option>
+                            <option value="HFC">HFC</option>
+                            <option value="WISP">WISP</option>
+                            <option value="OTRO">OTRO</option>
+                        </select>
+                        <input id="plan-precio" type="number" step="0.01" min="0" placeholder="Precio mensual">
+                        <input id="plan-moneda" type="text" placeholder="Moneda (Ej. USD)" value="USD">
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:12px;">
+                        <button type="button" data-action="save-plan" style="width:auto; padding:10px 14px;">Guardar plan</button>
+                        <button type="button" data-action="cancel-plan" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table id="planes-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Velocidad</th>
+                        <th>Precio</th>
+                        <th>Moneda</th>
+                        <th>Tecnología</th>
+                        <th>Servicios activos</th>
+                    </tr>
+                </thead>
+                <tbody id="planes-list"></tbody>
+            </table>
+        </div>
+        <div id="planes-pagination" class="pagination-row"></div>
+    </div>
 </div>
 <div id="contratos" class="page">
-<div class="card">
-<div class="toolbar" data-toolbar="contratos">
-<input id="contratos-search" class="search-box" type="text" placeholder="🔍 Buscar contrato..." oninput="renderContratosPage(1)">
-<button type="button" class="toolbar-btn" data-module="contratos" data-action="new" onclick="toggleContratoForm()">Nuevo contrato</button>
-<button type="button" class="toolbar-btn" data-module="contratos" data-action="edit" onclick="const contratoId = getSelectedId('contratos'); if (contratoId) editarContrato(contratoId);">Editar</button>
-<button type="button" class="toolbar-btn" data-module="contratos" data-action="delete" onclick="const contratoId = getSelectedId('contratos'); if (contratoId) eliminarContrato(contratoId);">Eliminar</button>
+    <div class="card">
+        <div class="toolbar" data-toolbar="contratos">
+            <input id="contratos-search" class="search-box" type="text" placeholder="🔍 Buscar contrato...">
+            <button type="button" class="toolbar-btn" data-module="contratos" data-action="new">Nuevo contrato</button>
+            <button type="button" class="toolbar-btn" data-module="contratos" data-action="edit" disabled>Editar</button>
+            <button type="button" class="toolbar-btn" data-module="contratos" data-action="delete" disabled>Eliminar</button>
+        </div>
+        <div id="contrato-modal" class="modal-overlay" style="display:none;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>Datos del contrato</h3>
+                    <button type="button" class="modal-close">×</button>
+                </div>
+                <form id="contrato-form" class="modal-form">
+                    <input id="contrato-id" type="hidden">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                        <select id="contrato-servicio"></select>
+                        <input id="contrato-fecha-inicio" type="date" placeholder="Fecha de inicio">
+                        <input id="contrato-fecha-fin" type="date" placeholder="Fecha de fin (si aplica)">
+                        <select id="contrato-tipo">
+                            <option value="indefinido">Indefinido</option>
+                            <option value="plazo_fijo">Plazo fijo</option>
+                            <option value="promocional">Promocional</option>
+                        </select>
+                        <select id="contrato-estado">
+                            <option value="vigente">Vigente</option>
+                            <option value="vencido">Vencido</option>
+                            <option value="rescindido">Rescindido</option>
+                        </select>
+                    </div>
+                    <textarea id="contrato-observaciones" placeholder="Observaciones" style="margin-top:12px;"></textarea>
+                    <textarea id="contrato-draft-preview" readonly placeholder="El borrador legal del contrato aparecerá aquí" style="margin-top:12px; min-height:120px; resize:vertical;"></textarea>
+                    <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                        <button type="button" data-action="save-contrato" style="width:auto; padding:10px 14px;">Guardar contrato</button>
+                        <button type="button" data-action="export-contrato" style="width:auto; padding:10px 14px; background:#0f766e;">Exportar borrador a PDF</button>
+                        <button type="button" data-action="cancel-contrato" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table id="contratos-table">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Cédula</th>
+                        <th>Servicio</th>
+                        <th>Inicio</th>
+                        <th>Fin</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="contratos-list"></tbody>
+            </table>
+        </div>
+        <div id="contratos-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
+        <div id="contratos-pagination" class="pagination-row"></div>
+    </div>
 </div>
-<div id="contrato-modal" class="modal-overlay" style="display:none;">
-<div class="modal-card">
-<div class="modal-header">
-<h3>Datos del contrato</h3>
-<button type="button" class="modal-close" onclick="toggleContratoForm(true)">×</button>
-</div>
-<form id="contrato-form" class="modal-form">
-<input id="contrato-id" type="hidden">
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
-<select id="contrato-servicio" onchange="refreshContratoDraft()"></select>
-<input id="contrato-fecha-inicio" type="date" placeholder="Fecha de inicio" oninput="refreshContratoDraft()" onchange="refreshContratoDraft()">
-<input id="contrato-fecha-fin" type="date" placeholder="Fecha de fin (si aplica)" oninput="refreshContratoDraft()" onchange="refreshContratoDraft()">
-<select id="contrato-tipo" onchange="refreshContratoDraft()">
-<option value="indefinido">Indefinido</option>
-<option value="plazo_fijo">Plazo fijo</option>
-<option value="promocional">Promocional</option>
-</select>
-<select id="contrato-estado" onchange="refreshContratoDraft()">
-<option value="vigente">Vigente</option>
-<option value="vencido">Vencido</option>
-<option value="rescindido">Rescindido</option>
-</select>
-</div>
-<textarea id="contrato-observaciones" placeholder="Observaciones" style="margin-top:12px;" oninput="refreshContratoDraft()" onchange="refreshContratoDraft()"></textarea>
-<textarea id="contrato-draft-preview" readonly placeholder="El borrador legal del contrato aparecerá aquí" style="margin-top:12px; min-height:120px; resize:vertical;"></textarea>
-<div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-<button type="button" onclick="guardarContrato()" style="width:auto; padding:10px 14px;">Guardar contrato</button>
-<button type="button" onclick="exportContratoPdf()" style="width:auto; padding:10px 14px; background:#0f766e;">Exportar borrador a PDF</button>
-<button type="button" onclick="toggleContratoForm(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
-</div>
-</form>
-</div>
-</div>
-<div class="table-wrap">
-<table id="contratos-table">
-<thead>
-<tr>
-<th>Cliente</th>
-<th>Servicio</th>
-<th>Inicio</th>
-<th>Fin</th>
-<th>Tipo</th>
-<th>Estado</th>
-</tr>
-</thead>
-<tbody id="contratos-list"></tbody>
-</table>
-</div>
-<div id="contratos-pagination" class="pagination-row"></div>
-</div>
-</div>
-<!-- ==================== FIN MÓDULO FINANZAS ==================== -->
 
-<!-- ==================== MÓDULO NUEVO (CORRECCIÓN FASE 2.5): SERVICIOS ====================
-         CORRECCIÓN CRÍTICA: este modal NO existía en el index.html anterior, pese a
-         que app.js (toggleServicioForm(), abrirNuevoServicio(), guardarServicio(),
-         editarServicio()) ya buscaba document.getElementById('servicio-modal') desde
-         que se implementó el módulo de servicios. Sin este bloque, el botón
-         "+ Añadir servicio" de la ficha del cliente (renderClientProfile() en app.js)
-         no producía ningún efecto visible: el modal buscado era `null`.
-         Se anida como modal global (no como página propia del sidebar) porque
-         conceptualmente un servicio siempre pertenece al cliente que se está viendo
-         en ese momento — mismo criterio documentado en app.js. Los IDs de campo
-         (servicio-id, servicio-cliente-id, servicio-alias, servicio-direccion,
-         servicio-latitud, servicio-longitud, servicio-nap, servicio-plan,
-         servicio-estado) son EXACTAMENTE los que ya esperaba app.js — no se
-         renombró nada, se completó lo que faltaba. -->
     <div id="servicio-modal" class="modal-overlay" style="display:none;">
         <div class="modal-card">
             <div class="modal-header">
@@ -1053,33 +1425,32 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
             </form>
         </div>
     </div>
-    <!-- ==================== FIN MÓDULO SERVICIOS ==================== -->
 
     <div id="roles" class="page">
         <div class="card">
             <div class="toolbar" data-toolbar="roles">
-                <input id="roles-search" class="search-box" type="text" placeholder="Buscar rol..." oninput="if(typeof renderRoleList === 'function') renderRoleList(window.rolesCache)">
-                <button type="button" class="toolbar-btn" data-module="roles" data-action="new" onclick="toggleRoleModal()">Nuevo rol</button>
-                <button type="button" class="toolbar-btn" data-module="roles" data-action="context" onclick="const roleId = getSelectedId('roles'); if (roleId) { showPage('modulos'); preseleccionarRolEnModulos(roleId); }" disabled>Módulos</button>
-                <button type="button" class="toolbar-btn" data-module="roles" data-action="edit" onclick="const roleId = getSelectedId('roles'); if (roleId) abrirEditarRol(roleId);" disabled>Editar</button>
-                <button type="button" class="toolbar-btn" data-module="roles" data-action="delete" onclick="const roleId = getSelectedId('roles'); if (roleId) eliminarRol(roleId);" disabled>Eliminar</button>
+                <input id="roles-search" class="search-box" type="text" placeholder="🔍 Buscar rol...">
+                <button type="button" class="toolbar-btn" data-module="roles" data-action="new">Nuevo rol</button>
+                <button type="button" class="toolbar-btn" data-module="roles" data-action="edit" disabled>Editar</button>
+                <button type="button" class="toolbar-btn" data-module="roles" data-action="delete" disabled>Eliminar</button>
             </div>
 
             <div id="role-modal" class="modal-overlay" style="display:none;">
                 <div class="modal-card">
                     <div class="modal-header">
-                        <h3>Nuevo rol</h3>
-                        <button type="button" class="modal-close" onclick="toggleRoleModal(true)">×</button>
+                        <h3 id="role-modal-title">Nuevo rol</h3>
+                        <button type="button" class="modal-close">×</button>
                     </div>
                     <form id="role-form" class="modal-form">
+                        <input id="role-id" type="hidden">
                         <div style="display:grid; gap:12px;">
-                            <label for="config-new-role-name">Nombre del rol</label>
-                            <input id="config-new-role-name" type="text" placeholder="Ej. Operador">
+                            <label for="role-name">Nombre del rol</label>
+                            <input id="role-name" type="text" placeholder="Ej. Operador">
                         </div>
-                        <div id="config-role-feedback" style="margin-top:6px; color:green;"></div>
+                        <div id="role-feedback" style="margin-top:6px; color:green;"></div>
                         <div style="display:flex; gap:8px; margin-top:12px;">
-                            <button type="button" onclick="crearRol()" style="width:auto; padding:10px 14px;">Crear rol</button>
-                            <button type="button" onclick="toggleRoleModal(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                            <button type="button" data-action="save-role" style="width:auto; padding:10px 14px;">Guardar rol</button>
+                            <button type="button" data-action="cancel-role" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
                         </div>
                     </form>
                 </div>
@@ -1096,6 +1467,8 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                     <tbody id="roles-list"></tbody>
                 </table>
             </div>
+            <div id="roles-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
+            <div id="roles-pagination" class="pagination-row"></div>
         </div>
     </div>
 
@@ -1104,10 +1477,10 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; align-items:end;">
                 <div>
                     <label for="modulos-role-select">Rol</label>
-                    <select id="modulos-role-select" onchange="loadRolePermissions('modulos')"></select>
+                    <select id="modulos-role-select"></select>
                 </div>
                 <div>
-                    <button type="button" onclick="guardarPermisos('modulos')" style="width:auto; padding:10px 14px;">Guardar</button>
+                    <button type="button" id="modulos-save-btn" style="width:auto; padding:10px 14px;">Guardar</button>
                 </div>
             </div>
             <div id="modulos-permissions-feedback" style="margin-top:12px; color:green; font-weight:600;"></div>
@@ -1117,32 +1490,92 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
 
     <div id="empresa" class="page">
         <div class="card">
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; align-items: start; margin-top: 16px;">
-                <!-- Columna Izquierda: Formulario -->
-                <div style="display:grid; gap:16px;">
-                    <div>
-                        <label for="empresa-nombre">Nombre de la empresa</label>
-                        <input id="empresa-nombre" type="text" placeholder="REDYTELCA">
-                    </div>
-                    <div>
-                        <label for="empresa-logo">Logotipo</label>
-                        <input id="empresa-logo" type="file" accept="image/*">
-                    </div>
-                    <div>
-                        <label for="empresa-color">Color de acento (Botones y enlaces)</label>
-                        <input id="empresa-color" type="color" value="#104aa8" style="height: 44px; padding: 4px; cursor: pointer;">
-                    </div>
-                    <div id="empresa-feedback" style="color:green; font-weight:600;"></div>
-                    <button type="button" onclick="guardarEmpresa()" style="width:auto; padding:12px 14px;">Guardar cambios</button>
+            <div class="card-title-row">
+                <h3>Identidad visual</h3>
+                <span>Aparece en el login, el sidebar y los documentos impresos.</span>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top:16px;">
+                <div>
+                    <label for="empresa-nombre">Nombre de la empresa</label>
+                    <input id="empresa-nombre" type="text" placeholder="REDYTELCA" maxlength="100" autocomplete="organization">
                 </div>
-                
-                <!-- Columna Derecha: Vista Previa -->
-                <div class="preview-card" style="background:#f8fafc; border:1px solid var(--border); border-radius:14px; padding:24px; text-align:center; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
-                    <h4 style="margin:0 0 20px 0; color:var(--muted); font-size:0.85rem; text-transform:uppercase; letter-spacing:0.05em;">Vista Previa</h4>
-                    <img id="empresa-logo-preview" src="Logos/logo_transparent.png" alt="Vista previa del logo" class="payment-logo" style="margin: 0 auto 20px; max-height: 80px;">
-                    <button type="button" style="width:100%; cursor:default; pointer-events:none;">Botón de Muestra</button>
-                    <p style="margin-top:16px; font-size:0.85rem; color:var(--muted); line-height:1.4;">El color seleccionado se aplicará a todos los botones, enlaces y elementos interactivos de la plataforma.</p>
+                <div>
+                    <label for="empresa-color">Color de acento (botones y enlaces)</label>
+                    <input id="empresa-color" type="color" value="#104aa8" style="height:44px; padding:4px; cursor:pointer;">
                 </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:24px; margin-top:24px;">
+                <div>
+                    <div class="card-title-row" style="margin-bottom:12px;">
+                        <h4 style="margin:0; font-size:0.95rem;">Logo para login</h4>
+                        <small style="color:#64748b; font-size:0.8rem;">Se muestra sobre fondo blanco.</small>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid var(--border); border-radius:14px; padding:24px; text-align:center; min-height:120px; display:flex; align-items:center; justify-content:center;">
+                        <img id="empresa-logo-preview-login" src="Logos/logo_transparent.png" alt="Logo login" style="max-height:80px; max-width:100%;">
+                    </div>
+                    <input id="empresa-logo-login" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml" style="margin-top:12px;">
+                    <small style="color:#64748b; display:block; margin-top:4px;">JPG, PNG, WEBP, GIF o SVG. Máx. 2 MB.</small>
+                </div>
+
+                <div>
+                    <div class="card-title-row" style="margin-bottom:12px;">
+                        <h4 style="margin:0; font-size:0.95rem;">Logo para sidebar</h4>
+                        <small style="color:#64748b; font-size:0.8rem;">Se muestra sobre fondo oscuro.</small>
+                    </div>
+                    <div style="background:linear-gradient(180deg, #0f172a, #111827); border-radius:14px; padding:24px; text-align:center; min-height:120px; display:flex; align-items:center; justify-content:center;">
+                        <img id="empresa-logo-preview-sidebar" src="Logos/redytelca-identiadad-tipo-c-blanco.svg" alt="Logo sidebar" style="max-height:80px; max-width:100%;">
+                    </div>
+                    <input id="empresa-logo-sidebar" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml" style="margin-top:12px;">
+                    <small style="color:#64748b; display:block; margin-top:4px;">Recomendado: SVG o PNG con fondo transparente.</small>
+                </div>
+            </div>
+
+            <div class="preview-card" style="background:#f8fafc; border:1px solid var(--border); border-radius:14px; padding:16px; margin-top:24px;">
+                <h4 style="margin:0 0 12px 0; color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em;">Vista previa del botón</h4>
+                <button type="button" style="width:100%; cursor:default; pointer-events:none;">REDYTELCA</button>
+                <p style="margin-top:12px; font-size:0.8rem; color:var(--muted); line-height:1.4; text-align:center;">El nombre y el color se aplican a toda la plataforma al guardar.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title-row">
+                <h3>Parámetros del negocio</h3>
+                <span>Aplican al cálculo de facturas, mora y corte automático.</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top:16px;">
+                <div>
+                    <label for="empresa-impuesto">Impuesto aplicado (%)</label>
+                    <input id="empresa-impuesto" type="number" step="0.01" min="0" max="100" value="0" placeholder="0.00">
+                    <small style="color:#64748b; display:block; margin-top:4px;">IVA u otro tributo. 0 si no aplica.</small>
+                </div>
+                <div>
+                    <label for="empresa-dia-facturacion">Día de facturación</label>
+                    <input id="empresa-dia-facturacion" type="number" min="1" max="31" value="1" placeholder="1">
+                    <small style="color:#64748b; display:block; margin-top:4px;">Día del mes en que se emiten las facturas.</small>
+                </div>
+                <div>
+                    <label for="empresa-dias-gracia">Días de gracia por mora</label>
+                    <input id="empresa-dias-gracia" type="number" min="0" max="99" value="5" placeholder="5">
+                    <small style="color:#64748b; display:block; margin-top:4px;">Días tras el vencimiento antes de aplicar mora.</small>
+                </div>
+                <div>
+                    <label for="empresa-recargo-mora">Recargo por mora (USD)</label>
+                    <input id="empresa-recargo-mora" type="number" step="0.01" min="0" value="0" placeholder="0.00">
+                    <small style="color:#64748b; display:block; margin-top:4px;">Monto fijo en USD al pasar los días de gracia.</small>
+                </div>
+                <div>
+                    <label for="empresa-dias-corte">Días para corte automático</label>
+                    <input id="empresa-dias-corte" type="number" min="0" max="99" value="10" placeholder="10">
+                    <small style="color:#64748b; display:block; margin-top:4px;">Días tras el vencimiento para suspender el servicio.</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                <button type="button" data-action="save-empresa" style="width:auto; padding:12px 20px;">Guardar cambios</button>
             </div>
         </div>
     </div>
@@ -1156,7 +1589,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                     <span id="perfil-rol-badge" class="status status-ok" style="font-size:0.85rem;">Rol</span>
                 </div>
             </div>
-            
+
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom: 32px;">
                 <div class="detail-card">
                     <span class="detail-label">Nombre de usuario</span>
@@ -1191,15 +1624,15 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
             <div id="perfil-sesiones-pagination" class="pagination-row"></div>
         </div>
     </div>
-
-    <div id="usuarios" class="page">
+        <div id="usuarios" class="page">
         <div class="card">
             <div class="toolbar" data-toolbar="usuarios">
-                <input id="users-search" class="search-box" type="text" placeholder="Buscar usuario..." oninput="renderUsersPage(1)">
-                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="new" onclick="toggleUserModal()">Nuevo usuario</button>
-                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="edit" onclick="const userId = getSelectedId('usuarios'); if(userId) abrirEditarUsuario(userId);" disabled>Editar</button>
-                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="reset" onclick="const userId = getSelectedId('usuarios'); if(userId) { const btn = document.querySelector('#users-table tr[data-id=\''+userId+'\']'); abrirResetPassword(userId, btn ? btn.querySelector('td').innerText : ''); }" disabled>Restablecer</button>
-                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="delete" onclick="const userId = getSelectedId('usuarios'); if(userId) eliminarUsuario(userId);" disabled>Eliminar</button>
+                <input id="usuarios-search" class="search-box" type="text" placeholder="Buscar usuario...">
+                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="new">Nuevo usuario</button>
+                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="edit" disabled>Editar</button>
+                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="roles" disabled>Roles</button>
+                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="reset" disabled>Restablecer</button>
+                <button type="button" class="toolbar-btn" data-module="usuarios" data-action="delete" disabled>Eliminar</button>
             </div>
             <div id="user-filters" class="filter-row" style="margin-top: 12px;"></div>
 
@@ -1207,7 +1640,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <div class="modal-card">
                     <div class="modal-header">
                         <h3>Nuevo usuario</h3>
-                        <button type="button" class="modal-close" onclick="toggleUserModal(true)">×</button>
+                        <button type="button" class="modal-close" data-action="cancel-user">×</button>
                     </div>
                     <form id="user-form" class="modal-form">
                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
@@ -1219,16 +1652,17 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                                 <label for="new-user-email">Correo electrónico</label>
                                 <input id="new-user-email" type="email" placeholder="usuario@empresa.com">
                             </div>
-                            <div>
-                                <label for="new-user-role">Rol</label>
-                                <select id="new-user-role"></select>
-                            </div>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <label>Roles</label>
+                            <div id="new-user-roles-checkboxes" style="display:flex; flex-direction:column; gap:8px; padding:8px; border:1px solid var(--border); border-radius:10px; max-height:200px; overflow-y:auto;"></div>
+                            <small style="color:#64748b;">Marca todos los roles que correspondan al usuario.</small>
                         </div>
                         <div style="margin-top:6px; color:#475569; font-size:0.95rem;">Se asignará una contraseña temporal por defecto. El usuario deberá cambiarla en su primer ingreso.</div>
                         <div id="user-feedback" style="margin-top:10px; color:green;"></div>
                         <div style="display:flex; gap:8px; margin-top:12px;">
-                            <button type="button" onclick="crearUsuario()" style="width:auto; padding:10px 14px;">Crear usuario</button>
-                            <button type="button" onclick="toggleUserModal(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                            <button type="button" data-action="save-user" style="width:auto; padding:10px 14px;">Crear usuario</button>
+                            <button type="button" data-action="cancel-user" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
                         </div>
                     </form>
                 </div>
@@ -1238,17 +1672,19 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                 <table id="users-table">
                     <thead>
                         <tr>
+                            <th>ID</th>
                             <th>Usuario</th>
                             <th>Correo</th>
                             <th>Rol</th>
-                            <th>Correo verificado</th>
-                            <th>Cambio pendiente</th>
+                            <th>Estado</th>
+                            <th>Verificado</th>
                             <th>Última conexión</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
             </div>
+            <div id="usuarios-counter" class="text-muted" style="margin-top:8px; font-size:0.85rem;"></div>
             <div id="users-pagination" class="pagination-row"></div>
         </div>
     </div>
@@ -1257,7 +1693,7 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
         <div class="modal-card modal-lg">
             <div class="modal-header">
                 <h3>Editar usuario</h3>
-                <button type="button" class="modal-close" onclick="document.getElementById('edit-user-modal').style.display='none'">×</button>
+                <button type="button" class="modal-close" data-action="cancel-user-edit">×</button>
             </div>
             <div style="display:grid; gap:14px;">
                 <input id="edit-user-id" type="hidden">
@@ -1269,29 +1705,35 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
                     <label for="edit-user-email">Correo electrónico</label>
                     <input id="edit-user-email" type="email" placeholder="usuario@empresa.com">
                 </div>
-                <div>
-                    <label>Roles</label>
-                    <div id="edit-user-roles-checkboxes" style="display:flex; flex-direction:column; gap:8px; padding:8px; border:1px solid var(--border); border-radius:10px; max-height:200px; overflow-y:auto;"></div>
-                    <small style="color:#64748b;">Marca todos los roles que correspondan al usuario.</small>
+                <div style="display:flex; gap:8px; margin-top:4px;">
+                    <button type="button" data-action="save-user-edit" style="width:auto; padding:10px 14px;">Guardar cambios</button>
+                    <button type="button" data-action="cancel-user-edit" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
                 </div>
-                <button type="button" onclick="guardarUsuarioEditado()" style="width:auto; padding:10px 14px;">Guardar cambios</button>
             </div>
         </div>
     </div>
 
-    <div id="edit-role-modal" class="modal-overlay" style="display:none;">
+    <div id="user-roles-modal" class="modal-overlay" style="display:none;">
         <div class="modal-card modal-lg">
             <div class="modal-header">
-                <h3>Editar rol</h3>
-                <button type="button" class="modal-close" onclick="document.getElementById('edit-role-modal').style.display='none'">×</button>
+                <h3>Editar roles del usuario</h3>
+                <button type="button" class="modal-close" data-action="cancel-user-roles">×</button>
             </div>
             <div style="display:grid; gap:14px;">
-                <input id="edit-role-id" type="hidden">
+                <input id="user-roles-id" type="hidden">
                 <div>
-                    <label for="edit-role-name">Nombre del rol</label>
-                    <input id="edit-role-name" type="text" placeholder="Ej. Operador">
+                    <label>Usuario</label>
+                    <div id="user-roles-username" class="profile-info-value">—</div>
                 </div>
-                <button type="button" onclick="guardarRolEditado()" style="width:auto; padding:10px 14px;">Guardar cambios</button>
+                <div>
+                    <label>Roles asignados</label>
+                    <div id="user-roles-checkboxes" style="display:flex; flex-direction:column; gap:8px; padding:8px; border:1px solid var(--border); border-radius:10px; max-height:260px; overflow-y:auto;"></div>
+                    <small style="color:#64748b;">Marca todos los roles que correspondan al usuario.</small>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:4px;">
+                    <button type="button" data-action="save-user-roles" style="width:auto; padding:10px 14px;">Guardar roles</button>
+                    <button type="button" data-action="cancel-user-roles" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1310,13 +1752,16 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
         <div class="modal-card modal-lg">
             <div class="modal-header">
                 <h3>Restablecer contraseña</h3>
-                <button type="button" class="modal-close" onclick="toggleResetPasswordModal(true)">×</button>
+                <button type="button" class="modal-close" data-action="cancel-password">×</button>
             </div>
             <div style="display:grid; gap:14px;">
                 <input id="reset-user-id" type="hidden">
                 <input id="reset-username" type="text" readonly>
                 <input id="reset-new-password" type="password" placeholder="Nueva contraseña">
-                <button type="button" onclick="guardarResetPassword()" style="width:auto; padding:10px 14px;">Actualizar contraseña</button>
+                <div style="display:flex; gap:8px; margin-top:4px;">
+                    <button type="button" data-action="save-password" style="width:auto; padding:10px 14px;">Actualizar contraseña</button>
+                    <button type="button" data-action="cancel-password" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                </div>
                 <div id="reset-password-feedback" style="color:green;"></div>
             </div>
         </div>
@@ -1336,60 +1781,367 @@ document.documentElement.style.setProperty('--accent-rgb', r + ', ' + g + ', ' +
         <div class="modal-card">
             <div class="modal-header">
                 <h3>Cambiar contraseña</h3>
-                <button id="password-modal-close" type="button" class="modal-close" onclick="document.getElementById('password-modal').style.display='none'">×</button>
+                <button id="password-modal-close" type="button" class="modal-close">×</button>
             </div>
             <div class="modal-form">
                 <input id="password-user" type="text" placeholder="Usuario" readonly>
                 <input id="password-current" type="password" placeholder="Contraseña actual">
                 <input id="password-new" type="password" placeholder="Nueva contraseña">
                 <input id="password-confirm" type="password" placeholder="Confirmar nueva contraseña">
-                <button type="button" onclick="cambiarPassword()" style="margin-top:12px;">Actualizar contraseña</button>
+                <button type="button" data-action="change-password" style="margin-top:12px;">Actualizar contraseña</button>
                 <div id="password-feedback" style="margin-top: 10px; color: green;"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- B3.13: #equipo-modal movido aquí, a nivel de main.
+         Vive fuera de .page para poder abrirse desde Pedidos (botón
+         "+ Crear equipo nuevo" del sub-modal de reserva). -->
+    <div id="equipo-modal" class="modal-overlay" style="display:none; z-index:1300;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Datos del equipo</h3>
+                <button type="button" class="modal-close" onclick="toggleEquipoForm(true)">×</button>
+            </div>
+            <form id="equipo-form" class="modal-form">
+                <input id="equipo-id" type="hidden">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                    <select id="equipo-tipo">
+                        <option value="ONU">ONU</option>
+                        <option value="COMBO">COMBO</option>
+                        <option value="ROUTER">ROUTER</option>
+                    </select>
+                    <input id="equipo-marca" type="text" placeholder="Marca">
+                    <input id="equipo-modelo" type="text" placeholder="Modelo">
+                    <input id="equipo-mac" type="text" placeholder="AA:BB:CC:DD:EE:FF">
+                    <input id="equipo-puerto" type="number" placeholder="Número de puerto" min="1">
+                    <select id="equipo-estado">
+                        <option value="stock">Stock</option>
+                        <option value="asignado">Asignado</option>
+                        <option value="devuelto">Devuelto</option>
+                        <option value="averiado">Averiado</option>
+                        <option value="baja">Baja</option>
+                    </select>
+                    <select id="equipo-propiedad">
+                        <option value="empresa">Empresa (comodato)</option>
+                        <option value="cliente">Cliente (propio)</option>
+                    </select>
+                    <select id="equipo-nap"></select>
+                    <select id="equipo-servicio"></select>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <button type="button" onclick="guardarEquipo()" style="width:auto; padding:10px 14px;">Guardar equipo</button>
+                    <button type="button" onclick="toggleEquipoForm(true)" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- B3.9: #task-modal movido aquí (nivel de main, fuera de cualquier .page). -->
+    <div id="task-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="task-modal-title">Nueva tarea</h3>
+                <button type="button" class="modal-close" data-action="cancel-tarea">×</button>
+            </div>
+            <form id="task-form" class="modal-form">
+                <input id="task-id" type="hidden">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                    <input id="task-title" type="text" placeholder="Título de la tarea" required>
+                    <select id="task-status">
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="En curso">En curso</option>
+                        <option value="Completada">Completada</option>
+                    </select>
+                    <select id="task-priority">
+                        <option value="Alta">Alta</option>
+                        <option value="Media" selected>Media</option>
+                        <option value="Baja">Baja</option>
+                    </select>
+                    <select id="task-client">
+                        <option value="">Sin cliente</option>
+                    </select>
+                    <select id="task-ticket">
+                        <option value="">Sin ticket</option>
+                    </select>
+                    <select id="task-servicio">
+                        <option value="">Sin servicio</option>
+                    </select>
+                </div>
+                <textarea id="task-description" placeholder="Descripción" style="margin-top:12px;"></textarea>
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <button type="button" data-action="save-tarea" style="width:auto; padding:10px 14px;">Guardar tarea</button>
+                    <button type="button" data-action="cancel-tarea" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- B3.10: 5 modales de Pedidos a nivel de main (fuera de .page). -->
+    <div id="pedido-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="pedido-modal-title">Nuevo pedido</h3>
+                <button type="button" class="modal-close" data-action="cancel-pedido">×</button>
+            </div>
+            <form id="pedido-form" class="modal-form">
+                <input id="pedido-id" type="hidden">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                    <select id="pedido-cliente">
+                        <option value="">Selecciona un cliente</option>
+                    </select>
+                    <select id="pedido-servicio">
+                        <option value="">Sin servicio</option>
+                    </select>
+                    <select id="pedido-tipo">
+                        <option value="instalacion">Instalación</option>
+                        <option value="reparacion">Reparación</option>
+                        <option value="retiro">Retiro</option>
+                        <option value="cambio_plan">Cambio plan</option>
+                        <option value="traslado">Traslado</option>
+                    </select>
+                    <select id="pedido-prioridad">
+                        <option value="Alta">Alta</option>
+                        <option value="Media" selected>Media</option>
+                        <option value="Baja">Baja</option>
+                    </select>
+                    <select id="pedido-estado">
+                        <option value="pendiente">Pendiente</option>
+                        <option value="asignado">Asignado</option>
+                        <option value="en_curso">En curso</option>
+                        <option value="completado">Completado</option>
+                        <option value="cancelado">Cancelado</option>
+                    </select>
+                    <input id="pedido-fecha-programada" type="date" placeholder="Fecha programada">
+                </div>
+                <textarea id="pedido-descripcion" placeholder="Descripción del pedido" style="margin-top:12px;"></textarea>
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <button type="button" data-action="save-pedido" style="width:auto; padding:10px 14px;">Guardar pedido</button>
+                    <button type="button" data-action="cancel-pedido" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="asignar-tecnico-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="asignar-tecnico-title">Asignar técnico</h3>
+                <button type="button" class="modal-close" data-action="cancel-asignar">×</button>
+            </div>
+            <div class="modal-form">
+                <input id="asignar-tecnico-id-pedido" type="hidden">
+                <div id="asignar-tecnico-info" style="margin-bottom:12px;"></div>
+                <label for="asignar-tecnico-select">Técnico</label>
+                <select id="asignar-tecnico-select">
+                    <option value="">Selecciona un técnico</option>
+                </select>
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <button type="button" data-action="confirm-asignar" style="width:auto; padding:10px 14px;">Asignar técnico</button>
+                    <button type="button" data-action="cancel-asignar" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="materiales-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3 id="materiales-title">Materiales del pedido</h3>
+                <button type="button" class="modal-close" data-action="close-materiales">×</button>
+            </div>
+            <div id="materiales-info" style="margin-bottom:12px;"></div>
+            <input id="materiales-id-pedido" type="hidden">
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Descripción</th>
+                            <th>Cantidad</th>
+                            <th>Unidad</th>
+                            <th>Equipo</th>
+                            <th>Notas</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="materiales-list"></tbody>
+                </table>
+            </div>
+            <hr style="margin:16px 0; border:none; border-top:1px solid var(--border);">
+            <h4 style="margin:0 0 8px; font-size:0.95rem;">Añadir material</h4>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+                <input id="material-descripcion" type="text" placeholder="Descripción (ej. Cable UTP cat 6)">
+                <input id="material-cantidad" type="number" step="0.01" min="0.01" placeholder="Cantidad" value="1">
+                <input id="material-unidad" type="text" placeholder="Unidad (ej. metro)" value="unidad">
+                <select id="material-equipo">
+                    <option value="">Sin equipo</option>
+                </select>
+                <input id="material-notas" type="text" placeholder="Notas (opcional)">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button type="button" data-action="add-material" style="width:auto; padding:10px 14px;">Añadir material</button>
+                <button type="button" data-action="close-materiales" style="width:auto; padding:10px 14px; background:#64748b;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="asignar-equipo-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="asignar-equipo-title">Reservar equipo</h3>
+                <button type="button" class="modal-close" data-action="cancel-asignar-equipo">×</button>
+            </div>
+            <div class="modal-form">
+                <input id="asignar-equipo-id-pedido" type="hidden">
+                <div id="asignar-equipo-info" style="margin-bottom:12px;"></div>
+                <label for="asignar-equipo-select">Equipo en stock</label>
+                <select id="asignar-equipo-select">
+                    <option value="">Selecciona un equipo en stock</option>
+                </select>
+                <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                    <button type="button" data-action="reload-equipos" style="width:auto; padding:8px 12px; background:#64748b;">Recargar lista</button>
+                    <button type="button" data-action="new-equipo" style="width:auto; padding:8px 12px; background:#0ea5e9;">+ Crear equipo nuevo</button>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:16px;">
+                    <button type="button" data-action="confirm-asignar-equipo" style="width:auto; padding:10px 14px;">Reservar equipo</button>
+                    <button type="button" data-action="cancel-asignar-equipo" style="width:auto; padding:10px 14px; background:#64748b;">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="historial-asignaciones-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3 id="historial-title">Historial de asignaciones</h3>
+                <button type="button" class="modal-close" data-action="close-historial">×</button>
+            </div>
+            <div id="historial-info" style="margin-bottom:12px;"></div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Técnico</th>
+                            <th>Asignado por</th>
+                            <th>Estado</th>
+                            <th>Fecha asignación</th>
+                            <th>Fecha cierre</th>
+                            <th>Motivo rechazo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historial-list"></tbody>
+                </table>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button type="button" data-action="close-historial" style="width:auto; padding:10px 14px; background:#64748b;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ubicacion-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3 id="ubicacion-title">Ubicación del servicio</h3>
+                <button type="button" class="modal-close" data-action="close-ubicacion">×</button>
+            </div>
+            <div id="ubicacion-content"></div>
         </div>
     </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="app.js"></script>
-<script>
-    (function() {
-        const assets = [
-            { id: 'login-brand-logo', file: 'Logos/logo_transparent.png' },
-            { id: 'sidebar-brand-logo', file: 'Logos/redytelca-identiadad-tipo-c-blanco.svg' }
-        ];
-        const candidates = ['', '../', '../../', '../../../'];
-
-        function resolveAssetPath(file, callback) {
-            let index = 0;
-            function tryNext() {
-                if (index >= candidates.length) {
-                    callback(candidates[0] + file);
-                    return;
-                }
-                const candidate = candidates[index++];
-                const path = candidate + file;
-                const img = new Image();
-                img.onload = function() {
-                    callback(path);
-                };
-                img.onerror = function() {
-                    tryNext();
-                };
-                img.src = path;
-            }
-            tryNext();
-        }
-
-        assets.forEach(asset => {
-            const element = document.getElementById(asset.id);
-            if (!element) return;
-            resolveAssetPath(asset.file, function(path) {
-                element.src = path;
-            });
-        });
-    })();
-</script>
+<script src="js/core/Session.js"></script>
+<script src="js/core/ApiClient.js"></script>
+<script src="js/core/Router.js"></script>
+<script src="js/core/Modal.js"></script>
+<script src="js/core/Toast.js"></script>
+<script src="js/core/Pagination.js"></script>
+<script src="js/core/helpers.js"></script>
+<script src="js/controllers/AuthController.js"></script>
+<script src="js/models/ClienteModel.js"></script>
+<script src="js/models/ServicioModel.js"></script>
+<script src="js/models/PlanModel.js"></script>
+<script src="js/models/NodoModel.js"></script>
+<script src="js/models/OltModel.js"></script>
+<script src="js/models/NapModel.js"></script>
+<script src="js/models/EquipoModel.js"></script>
+<script src="js/models/ConfiguracionEmpresaModel.js"></script>
+<script src="js/views/ClienteView.js"></script>
+<script src="js/views/ServicioView.js"></script>
+<script src="js/views/NodoView.js"></script>
+<script src="js/views/OltView.js"></script>
+<script src="js/views/NapView.js"></script>
+<script src="js/views/EquipoView.js"></script>
+<script src="js/controllers/ClienteController.js"></script>
+<script src="js/views/PlanView.js"></script>
+<script src="js/controllers/PlanController.js"></script>
+<script src="js/controllers/ServicioController.js"></script>
+<script src="js/controllers/NodoController.js"></script>
+<script src="js/controllers/OltController.js"></script>
+<script src="js/controllers/NapController.js"></script>
+<script src="js/controllers/EquipoController.js"></script>
+<script src="js/views/ConfiguracionEmpresaView.js"></script>
+<script src="js/controllers/ConfiguracionEmpresaController.js"></script>
+<script src="js/models/RolModel.js"></script>
+<script src="js/views/RolView.js"></script>
+<script src="js/controllers/RolController.js"></script>
+<script src="js/models/PermisoModel.js"></script>
+<script src="js/views/PermisoView.js"></script>
+<script src="js/controllers/PermisoController.js"></script>
+<script src="js/models/UsuarioModel.js"></script>
+<script src="js/views/UsuarioView.js"></script>
+<script src="js/controllers/UsuarioController.js"></script>
+<script src="js/models/FacturaModel.js"></script>
+<script src="js/views/FacturaView.js"></script>
+<script src="js/controllers/FacturaController.js"></script>
+<script src="js/models/PagoModel.js"></script>
+<script src="js/models/MetodoPagoModel.js"></script>
+<script src="js/views/PagoView.js"></script>
+<script src="js/controllers/PagoController.js"></script>
+<script src="js/models/ContratoModel.js"></script>
+<script src="js/views/ContratoView.js"></script>
+<script src="js/controllers/ContratoController.js"></script>
+<!-- B3.8 — Tickets + sub-CRUDs -->
+<script src="js/models/TicketModel.js"></script>
+<script src="js/views/TicketView.js"></script>
+<script src="js/controllers/TicketController.js"></script>
+<script src="js/models/CategoriaTicketModel.js"></script>
+<script src="js/views/CategoriaTicketView.js"></script>
+<script src="js/controllers/CategoriaTicketController.js"></script>
+<script src="js/models/SlaDefinicionModel.js"></script>
+<script src="js/views/SlaDefinicionView.js"></script>
+<script src="js/controllers/SlaDefinicionController.js"></script>
+<!-- B3.8.5 — Auditoría de operaciones -->
+<script src="js/models/AuditoriaLogModel.js"></script>
+<script src="js/views/AuditoriaLogView.js"></script>
+<script src="js/controllers/AuditoriaLogController.js"></script>
+<!-- B3.9 — Tareas -->
+<script src="js/models/TareaModel.js"></script>
+<script src="js/views/TareaView.js"></script>
+<script src="js/controllers/TareaController.js"></script>
+<!-- B3.10 — Pedidos -->
+<script src="js/models/PedidoModel.js"></script>
+<script src="js/views/PedidoView.js"></script>
+<script src="js/controllers/PedidoController.js"></script>
+<!-- B3.12 — Perfil -->
+<script src="js/models/PerfilModel.js"></script>
+<script src="js/views/PerfilView.js"></script>
+<script src="js/controllers/PerfilController.js"></script>
+<!-- B3.13 — Mapa -->
+<script src="js/views/MapaView.js"></script>
+<script src="js/controllers/MapaController.js"></script>
+<!-- B3.14 — Dashboard -->
+<script src="js/views/DashboardView.js"></script>
+<script src="js/controllers/DashboardController.js"></script>
+<!-- B3.15 — Reportes (Model + View + Controller) -->
+<script src="js/models/ReporteModel.js"></script>
+<script src="js/views/ReportesView.js"></script>
+<script src="js/controllers/ReportesController.js"></script>
+<!-- 086c — Notificaciones -->
+<script src="js/models/NotificacionModel.js"></script>
+<script src="js/views/NotificacionView.js"></script>
+<script src="js/controllers/NotificacionController.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

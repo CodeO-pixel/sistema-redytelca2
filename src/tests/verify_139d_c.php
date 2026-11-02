@@ -59,7 +59,7 @@ if ($body !== "") {
         $_POST = $decoded;
     }
 }
-$thinFile = __DIR__ . "/../" . ltrim($parts["path"], "/");
+$thinFile = __DIR__ . "/../../public/" . ltrim($parts["path"], "/");
 if (!file_exists($thinFile)) {
     echo "404 THIN NOT FOUND";
     exit;

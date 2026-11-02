@@ -11,9 +11,22 @@ use App\Repositories\PedidoRepository;
 use App\Repositories\ClienteRepository;
 use App\Repositories\ServicioRepository;
 use App\Repositories\UsuarioRepository;
+use App\Repositories\PedidoAsignacionRepository;
+use App\Repositories\PedidoMaterialRepository;
+use App\Repositories\EquipoRepository;
 
 /**
  * Servicio para la gestión de pedidos de campo.
+ *
+ * Flujo F2.35 (reserva → asignación al completar):
+ *   - crear(): el pedido nace pendiente. No asigna equipo.
+ *   - asignarTecnico(): registra historial y asigna técnico.
+ *   - completar(): cierra el pedido. Asigna el equipo reservado al
+ *     servicio, devuelve el anterior si era reemplazo, y activa el
+ *     servicio. Todo en transacción.
+ *
+ * Patrón de industria: Splynx, Sonar, NowaCRM, Dynamics 365 FS,
+ * TM Forum eTOM.
  */
 final class PedidoService extends BaseService
 {
@@ -29,6 +42,15 @@ final class PedidoService extends BaseService
     /** @var UsuarioRepository */
     private UsuarioRepository $usuarioRepo;
 
+    /** @var PedidoAsignacionRepository */
+    private PedidoAsignacionRepository $asignacionRepo;
+
+    /** @var PedidoMaterialRepository */
+    private PedidoMaterialRepository $materialRepo;
+
+    /** @var EquipoRepository */
+    private EquipoRepository $equipoRepo;
+
     /**
      * Constructor del servicio.
      *
@@ -41,28 +63,31 @@ final class PedidoService extends BaseService
         $this->clienteRepo = new ClienteRepository($pdo);
         $this->servicioRepo = new ServicioRepository($pdo);
         $this->usuarioRepo = new UsuarioRepository($pdo);
+        $this->asignacionRepo = new PedidoAsignacionRepository($pdo);
+        $this->materialRepo = new PedidoMaterialRepository($pdo);
+        $this->equipoRepo = new EquipoRepository($pdo);
     }
 
     /**
      * Crea un nuevo pedido.
      *
      * @param array $datos
+     * @param int $usuarioId
      * @return int
      * @throws NotFoundException
      * @throws ValidationException
      */
-    public function crear(array $datos): int
+    public function crear(array $datos, int $usuarioId): int
     {
+        unset($datos['usuario_creador_id']);
+        $datos['usuario_creador_id'] = $usuarioId;
+
         if (!isset($datos['cliente_id']) || !$this->clienteRepo->exists((int) $datos['cliente_id'])) {
             throw new NotFoundException('El cliente especificado no existe.');
         }
 
         if (isset($datos['servicio_id']) && !$this->servicioRepo->exists((int) $datos['servicio_id'])) {
             throw new NotFoundException('El servicio especificado no existe.');
-        }
-
-        if (isset($datos['usuario_creador_id']) && !$this->usuarioRepo->exists((int) $datos['usuario_creador_id'])) {
-            throw new NotFoundException('El usuario creador especificado no existe.');
         }
 
         if (isset($datos['tecnico_asignado_id']) && !$this->usuarioRepo->exists((int) $datos['tecnico_asignado_id'])) {
@@ -81,11 +106,16 @@ final class PedidoService extends BaseService
     /**
      * Actualiza un pedido existente.
      *
+     * No permite cambiar el estado a 'completado' por esta vía: el
+     * cierre va por completar(). Esto evita que un PUT genérico
+     * complete el pedido sin asignar el equipo reservado.
+     *
      * @param int $id
      * @param array $datos
      * @return void
      * @throws NotFoundException
      * @throws ValidationException
+     * @throws DomainException
      */
     public function actualizar(int $id, array $datos): void
     {
@@ -111,6 +141,10 @@ final class PedidoService extends BaseService
 
         $this->validarEnums($datos);
 
+        if (isset($datos['estado']) && $datos['estado'] === 'completado') {
+            throw new DomainException('Para completar un pedido usa la acción "Completar" (PUT api_pedidos_completar.php).');
+        }
+
         $this->pedidoRepo->update($id, $datos);
     }
 
@@ -131,15 +165,16 @@ final class PedidoService extends BaseService
     }
 
     /**
-     * Asigna un técnico a un pedido.
+     * Asigna un técnico a un pedido y registra el historial de asignación.
      *
      * @param int $id
      * @param int $tecnicoId
+     * @param int|null $usuarioAsignadorId
      * @return void
      * @throws NotFoundException
      * @throws DomainException
      */
-    public function asignarTecnico(int $id, int $tecnicoId): void
+    public function asignarTecnico(int $id, int $tecnicoId, ?int $usuarioAsignadorId = null): void
     {
         $pedido = $this->pedidoRepo->findById($id);
         if (!$pedido) {
@@ -154,10 +189,119 @@ final class PedidoService extends BaseService
             throw new NotFoundException('El técnico especificado no existe.');
         }
 
-        $this->pedidoRepo->update($id, [
-            'tecnico_asignado_id' => $tecnicoId,
-            'estado' => 'asignado'
-        ]);
+        $this->transaction(function () use ($id, $tecnicoId, $usuarioAsignadorId) {
+            $activa = $this->asignacionRepo->findActivaByPedidoId($id);
+            if ($activa) {
+                $this->asignacionRepo->update((int) $activa['id'], [
+                    'estado' => 'completada',
+                    'cerrado_en' => date('Y-m-d H:i:s')
+                ]);
+            }
+
+            $this->asignacionRepo->create([
+                'pedido_id' => $id,
+                'tecnico_id' => $tecnicoId,
+                'usuario_asignador_id' => $usuarioAsignadorId,
+                'estado' => 'activa'
+            ]);
+
+            $this->pedidoRepo->update($id, [
+                'tecnico_asignado_id' => $tecnicoId,
+                'estado' => 'asignado'
+            ]);
+        });
+    }
+
+    /**
+     * Completa un pedido y asigna formalmente el equipo reservado al
+     * servicio.
+     *
+     * En transacción:
+     *   1. Verifica que el pedido exista y no esté completado/cancelado.
+     *   2. Si el pedido es de instalación y tiene servicio_id:
+     *      a. Busca el equipo reservado (primer `pedido_materiales.equipo_id`).
+     *      b. Devuelve a `devuelto` cualquier equipo anterior del servicio.
+     *      c. Asigna el reservado: servicio_id, estado_inventario='asignado',
+     *         fecha_asignacion=HOY.
+     *      d. Si el servicio está `pendiente`, lo pasa a `activo`.
+     *   3. Marca el pedido como `completado` con fecha_completado=NOW().
+     *
+     * Idempotente: si ya está `completado`, no hace nada.
+     *
+     * @param int $id
+     * @return void
+     * @throws NotFoundException
+     * @throws DomainException
+     */
+    public function completar(int $id): void
+    {
+        $pedido = $this->pedidoRepo->findById($id);
+        if (!$pedido) {
+            throw new NotFoundException('Pedido no encontrado.');
+        }
+
+        if ($pedido['estado'] === 'completado') {
+            return;
+        }
+
+        if ($pedido['estado'] === 'cancelado') {
+            throw new DomainException('No se puede completar un pedido cancelado.');
+        }
+
+        $this->transaction(function () use ($id, $pedido) {
+            $servicioId = isset($pedido['servicio_id']) && $pedido['servicio_id'] !== null
+                ? (int) $pedido['servicio_id']
+                : null;
+            $esInstalacion = ((string) ($pedido['tipo'] ?? '')) === 'instalacion';
+
+            if ($esInstalacion && $servicioId !== null) {
+                // Buscar el equipo reservado (el primero con equipo_id).
+                $materiales = $this->materialRepo->findByPedidoId($id);
+                $equipoReservadoId = null;
+                foreach ($materiales as $m) {
+                    if (!empty($m['equipo_id'])) {
+                        $equipoReservadoId = (int) $m['equipo_id'];
+                        break;
+                    }
+                }
+
+                if ($equipoReservadoId !== null) {
+                    // Devolver a `devuelto` los equipos actualmente asignados
+                    // al servicio que no sean el reservado (reasignación).
+                    $equiposActuales = $this->equipoRepo->findByServicioId($servicioId);
+                    foreach ($equiposActuales as $eq) {
+                        if ((int) $eq['id'] === $equipoReservadoId) {
+                            continue;
+                        }
+                        $this->equipoRepo->update((int) $eq['id'], [
+                            'servicio_id' => null,
+                            'estado_inventario' => 'devuelto',
+                            'fecha_devolucion' => date('Y-m-d')
+                        ]);
+                    }
+
+                    // Asignar el equipo reservado al servicio.
+                    $this->equipoRepo->update($equipoReservadoId, [
+                        'servicio_id' => $servicioId,
+                        'estado_inventario' => 'asignado',
+                        'fecha_asignacion' => date('Y-m-d')
+                    ]);
+                }
+
+                // Activar el servicio si estaba pendiente.
+                $servicio = $this->servicioRepo->findById($servicioId);
+                if ($servicio && (string) ($servicio['estado_comercial'] ?? '') === 'pendiente') {
+                    $this->servicioRepo->update($servicioId, [
+                        'estado_comercial' => 'activo'
+                    ]);
+                }
+            }
+
+            $this->pedidoRepo->update($id, [
+                'estado' => 'completado',
+                'fecha_completado' => date('Y-m-d H:i:s')
+            ]);
+        });
     }
 
     /**
@@ -206,12 +350,16 @@ final class PedidoService extends BaseService
     /**
      * Obtiene los pedidos asignados a un técnico.
      *
+     * Fix B3.13 — usa findAllByTecnicoId (con joins) en lugar de
+     * findByTecnicoAsignadoId (SELECT plano), para que el listado del
+     * técnico traiga el mismo contrato enriquecido que el de Admin.
+     *
      * @param int $tecnicoId
      * @return array
      */
     public function listarPorTecnico(int $tecnicoId): array
     {
-        return $this->pedidoRepo->findByTecnicoAsignadoId($tecnicoId);
+        return $this->pedidoRepo->findAllByTecnicoId($tecnicoId);
     }
 
     /**
@@ -237,7 +385,7 @@ final class PedidoService extends BaseService
     }
 
     /**
-     * Método privado. Valida los ENUM de pedidos. No se llama desde fuera del service.
+     * Método privado. Valida los ENUM de pedidos.
      *
      * @param array $datos
      * @return void

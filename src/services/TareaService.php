@@ -51,12 +51,16 @@ final class TareaService extends BaseService
      * Crea una nueva tarea.
      *
      * @param array $datos
+     * @param int $usuarioId
      * @return int
      * @throws NotFoundException
      * @throws ValidationException
      */
-    public function crear(array $datos): int
+    public function crear(array $datos, int $usuarioId): int
     {
+        unset($datos['usuario_creador_id']);
+        $datos['usuario_creador_id'] = $usuarioId;
+
         if (isset($datos['cliente_id']) && !$this->clienteRepo->exists((int) $datos['cliente_id'])) {
             throw new NotFoundException('El cliente especificado no existe.');
         }
@@ -67,10 +71,6 @@ final class TareaService extends BaseService
 
         if (isset($datos['servicio_id']) && !$this->servicioRepo->exists((int) $datos['servicio_id'])) {
             throw new NotFoundException('El servicio especificado no existe.');
-        }
-
-        if (isset($datos['usuario_creador_id']) && !$this->usuarioRepo->exists((int) $datos['usuario_creador_id'])) {
-            throw new NotFoundException('El usuario creador especificado no existe.');
         }
 
         $this->validarEnums($datos);

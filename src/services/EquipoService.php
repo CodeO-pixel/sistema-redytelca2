@@ -24,11 +24,6 @@ final class EquipoService extends BaseService
     /** @var ServicioRepository */
     private ServicioRepository $servicioRepo;
 
-    /**
-     * Constructor del servicio.
-     *
-     * @param \PDO $pdo
-     */
     public function __construct(\PDO $pdo)
     {
         parent::__construct($pdo);
@@ -37,14 +32,6 @@ final class EquipoService extends BaseService
         $this->servicioRepo = new ServicioRepository($pdo);
     }
 
-    /**
-     * Crea un nuevo equipo.
-     *
-     * @param array $datos
-     * @return int
-     * @throws NotFoundException
-     * @throws ValidationException
-     */
     public function crear(array $datos): int
     {
         if (!isset($datos['nap_id']) || !$this->napRepo->exists((int) $datos['nap_id'])) {
@@ -60,15 +47,6 @@ final class EquipoService extends BaseService
         return $this->equipoRepo->create($datos);
     }
 
-    /**
-     * Actualiza un equipo existente.
-     *
-     * @param int $id
-     * @param array $datos
-     * @return void
-     * @throws NotFoundException
-     * @throws ValidationException
-     */
     public function actualizar(int $id, array $datos): void
     {
         $equipo = $this->equipoRepo->findById($id);
@@ -90,13 +68,6 @@ final class EquipoService extends BaseService
         $this->equipoRepo->update($id, $datos);
     }
 
-    /**
-     * Elimina un equipo.
-     *
-     * @param int $id
-     * @return void
-     * @throws NotFoundException
-     */
     public function eliminar(int $id): void
     {
         if (!$this->equipoRepo->exists($id)) {
@@ -106,92 +77,53 @@ final class EquipoService extends BaseService
         $this->equipoRepo->delete($id);
     }
 
-    /**
-     * Busca un equipo por su ID.
-     *
-     * @param int $id
-     * @return array|null
-     */
     public function buscarPorId(int $id): ?array
     {
         return $this->equipoRepo->findById($id);
     }
 
-    /**
-     * Busca un equipo por su dirección MAC.
-     *
-     * @param string $mac
-     * @return array|null
-     */
     public function buscarPorMac(string $mac): ?array
     {
         return $this->equipoRepo->findByMac($mac);
     }
 
-    /**
-     * Busca un equipo por su número de serie.
-     *
-     * @param string $serie
-     * @return array|null
-     */
     public function buscarPorSerie(string $serie): ?array
     {
         return $this->equipoRepo->findBySerie($serie);
     }
 
-    /**
-     * Obtiene los equipos asociados a una NAP.
-     *
-     * @param int $napId
-     * @return array
-     */
     public function listarPorNap(int $napId): array
     {
         return $this->equipoRepo->findByNapId($napId);
     }
 
-    /**
-     * Obtiene los equipos asignados a un servicio.
-     *
-     * @param int $servicioId
-     * @return array
-     */
     public function listarPorServicio(int $servicioId): array
     {
         return $this->equipoRepo->findByServicioId($servicioId);
     }
 
-    /**
-     * Obtiene los equipos filtrados por estado de inventario.
-     *
-     * @param string $estado
-     * @return array
-     */
     public function listarPorEstado(string $estado): array
     {
         return $this->equipoRepo->findByEstadoInventario($estado);
     }
 
     /**
-     * Busca un equipo por su NAP y puerto.
+     * Obtiene todos los equipos sin filtro.
      *
-     * @param int $napId
-     * @param int $puertoNap
-     * @return array|null
+     * 140c: usado por EquipoController::index cuando no hay filtro.
+     *
+     * @return array
      */
+    public function listarTodos(): array
+    {
+        return $this->equipoRepo->findAll();
+    }
+
     public function buscarPorNapPuerto(int $napId, int $puertoNap): ?array
     {
         return $this->equipoRepo->findByNapIdAndPuertoNap($napId, $puertoNap);
     }
 
-    /**
-     * Método privado. Valida los ENUM y los CHECK de la tabla equipos antes de persistir.
-     * No se llama desde fuera del service.
-     *
-     * @param array $datos
-     * @return void
-     * @throws ValidationException
-     */
     private function validarCoherencia(array $datos): void
     {
         if (isset($datos['tipo']) && !in_array($datos['tipo'], ['ONU', 'COMBO', 'ROUTER'], true)) {

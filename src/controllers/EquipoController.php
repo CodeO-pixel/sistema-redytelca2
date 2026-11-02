@@ -34,7 +34,7 @@ final class EquipoController extends BaseController
         } elseif ($estado !== '') {
             $equipos = $this->equipoService->listarPorEstado($estado);
         } else {
-            $equipos = $this->equipoService->listarPorEstado('stock');
+            $equipos = $this->equipoService->listarTodos();
         }
 
         $this->render(['status' => 'success', 'equipos' => $equipos], 200);

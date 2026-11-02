@@ -112,6 +112,7 @@ final class Auth
             WHERE s.token = ?
               AND (s.tipo_usuario = 'staff' OR s.tipo_usuario IS NULL)
               AND s.expira_en > NOW()
+              AND s.revocado_en IS NULL
         ");
         $stmt->execute([$token]);
         $sesion = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -158,9 +159,14 @@ final class Auth
      * Valida la autenticación de un cliente en el portal.
      *
      * @param \PDO $pdo Conexión a la base de datos.
+     * @param bool $bypassMustChangePassword Si es true, se salta el check de
+     *   must_change_password. Solo debe usarse desde api_portal_logout.php,
+     *   api_portal_auth_state.php y api_portal_cambiar_password.php.
+     *   El resto de la verificación (token vigente, credencial activa,
+     *   cliente no inactivo) se mantiene.
      * @return array Datos de la sesión del cliente.
      */
-    public static function requireClientAuth(\PDO $pdo): array
+    public static function requireClientAuth(\PDO $pdo, bool $bypassMustChangePassword = false): array
     {
         $token = self::getTokenFromHeader();
 
@@ -169,18 +175,23 @@ final class Auth
         }
 
         $stmt = $pdo->prepare("
-            SELECT s.id, s.credencial_id, cc.cliente_id
+            SELECT s.id, s.credencial_id, cc.cliente_id, cc.must_change_password
             FROM sesiones s
             INNER JOIN clientes_credenciales cc ON cc.id = s.credencial_id
             WHERE s.token = ?
               AND s.tipo_usuario = 'cliente'
               AND s.expira_en > NOW()
+              AND s.revocado_en IS NULL
         ");
         $stmt->execute([$token]);
         $sesion = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$sesion) {
             self::jsonError('Sesión inválida o expirada.', 401);
+        }
+
+        if (!$bypassMustChangePassword && isset($sesion['must_change_password']) && (int) $sesion['must_change_password'] === 1) {
+            self::jsonError('Debes cambiar tu contraseña antes de continuar.', 403);
         }
 
         $idCredencial = (int) $sesion['credencial_id'];
@@ -323,7 +334,7 @@ final class Auth
             header('Content-Type: application/json; charset=utf-8');
             http_response_code($httpStatus);
         }
-        echo json_encode(['status' => 'error', 'message' => $message]);
+        echo json_encode(['status' => 'error', 'message' => $message], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

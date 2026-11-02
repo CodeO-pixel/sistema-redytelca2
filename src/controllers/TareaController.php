@@ -27,11 +27,14 @@ final class TareaController extends BaseController
         $this->render(['status' => 'success', 'tareas' => $tareas], 200);
     }
 
-    public function store(): void
+    public function store(array $staffSession): void
     {
         $input = $this->input();
+        unset($input['usuario_creador_id']);
+
         $validated = TareaValidator::validateCreate($input);
-        $this->tareaService->crear($validated);
+        $usuarioId = (int) ($staffSession['id_usuario'] ?? 0);
+        $this->tareaService->crear($validated, $usuarioId);
         $this->render(['status' => 'success', 'message' => 'Tarea creada correctamente'], 200);
     }
 

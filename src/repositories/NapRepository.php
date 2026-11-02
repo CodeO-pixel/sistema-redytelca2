@@ -18,12 +18,21 @@ final class NapRepository extends BaseRepository
 
     /**
      * Obtiene todas las NAPs ordenadas por código ascendente.
+     * Incluye el código de la OLT (olt_codigo), el nombre del nodo (nodo_nombre)
+     * y la cantidad de servicios no retirados (total_clientes).
      *
      * @return array
      */
     public function findAllOrderedByCodigo(): array
     {
-        $sql = "SELECT * FROM {$this->table} ORDER BY codigo ASC";
+        $sql = "SELECT na.*, 
+                       o.codigo AS olt_codigo, 
+                       nd.nombre AS nodo_nombre, 
+                       (SELECT COUNT(*) FROM servicios s WHERE s.nap_id = na.id AND s.estado_comercial != 'retirado') AS total_clientes 
+                FROM {$this->table} na 
+                INNER JOIN olts o ON o.id = na.olt_id 
+                INNER JOIN nodos nd ON nd.id = o.nodo_id 
+                ORDER BY na.codigo ASC";
         $stmt = $this->prepareAndExecute($sql);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }

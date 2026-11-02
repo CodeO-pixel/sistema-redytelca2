@@ -1,4 +1,5 @@
 <?php
+// api_tickets.php
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../src/core/Bootstrap.php';
 
@@ -17,9 +18,9 @@ try {
         Auth::requireOperation($pdo, 'tickets', 'leer');
         $controller->index();
     } elseif ($method === 'POST') {
-        Auth::requirePageAccess($pdo, 'tickets');
+        $staffSession = Auth::requirePageAccess($pdo, 'tickets');
         Auth::requireOperation($pdo, 'tickets', 'crear');
-        $controller->store();
+        $controller->store($staffSession);
     } elseif ($method === 'PUT') {
         Auth::requirePageAccess($pdo, 'tickets');
         Auth::requireOperation($pdo, 'tickets', 'editar');

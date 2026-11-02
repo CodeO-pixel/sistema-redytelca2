@@ -1,3 +1,8 @@
+-- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
+--
+-- Host: localhost    Database: bd_redytelca
+-- ------------------------------------------------------
+-- Server version	10.4.32-MariaDB
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -9,6 +14,11 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `auditoria_logs`
+--
+
 DROP TABLE IF EXISTS `auditoria_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -33,7 +43,7 @@ CREATE TABLE `auditoria_logs` (
   CONSTRAINT `fk_log_credencial` FOREIGN KEY (`credencial_id`) REFERENCES `clientes_credenciales` (`id`),
   CONSTRAINT `fk_log_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `chk_log_actor` CHECK (`tipo_actor` = 'staff' and `usuario_id` is not null and `credencial_id` is null or `tipo_actor` = 'cliente' and `credencial_id` is not null and `usuario_id` is null or `tipo_actor` = 'sistema' and `usuario_id` is null and `credencial_id` is null)
-) ENGINE=InnoDB AUTO_INCREMENT=1220 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10446 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -55,20 +65,23 @@ DELIMITER ;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = cp850 */ ;
-/*!50003 SET character_set_results = cp850 */ ;
-/*!50003 SET collation_connection  = cp850_general_ci */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_auditoria_logs_inmutable_delete BEFORE DELETE ON auditoria_logs FOR EACH ROW BEGIN
-  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'auditoria_logs es inmutable: DELETE bloqueado.';
-END */;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER IF NOT EXISTS trg_auditoria_logs_inmutable_delete BEFORE DELETE ON auditoria_logs FOR EACH ROW BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'auditoria_logs es inmutable: DELETE bloqueado.'; END */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `categorias_ticket`
+--
+
 DROP TABLE IF EXISTS `categorias_ticket`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -81,7 +94,7 @@ CREATE TABLE `categorias_ticket` (
   `creado_en` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_categoria_nombre` (`nombre`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -144,6 +157,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `clientes`
+--
+
 DROP TABLE IF EXISTS `clientes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -165,7 +183,7 @@ CREATE TABLE `clientes` (
   KEY `idx_cliente_direccion` (`direccion_id`),
   CONSTRAINT `fk_cliente_direccion` FOREIGN KEY (`direccion_id`) REFERENCES `direccion` (`id`) ON DELETE SET NULL,
   CONSTRAINT `chk_clientes_cedula` CHECK (`cedula` regexp '^([VEJPG]-)?[0-9]{6,9}$')
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -232,6 +250,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `clientes_credenciales`
+--
+
 DROP TABLE IF EXISTS `clientes_credenciales`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -251,7 +274,7 @@ CREATE TABLE `clientes_credenciales` (
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `uq_cliente` (`cliente_id`),
   CONSTRAINT `fk_credencial_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -314,6 +337,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `configuracion_empresa`
+--
+
 DROP TABLE IF EXISTS `configuracion_empresa`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -321,6 +349,7 @@ CREATE TABLE `configuracion_empresa` (
   `id` int(11) NOT NULL,
   `nombre_empresa` varchar(100) NOT NULL DEFAULT '',
   `logo_path` varchar(255) DEFAULT NULL,
+  `logo_path_sidebar` varchar(255) DEFAULT NULL,
   `color_primario` char(7) DEFAULT '#104aa8',
   `impuesto_porcentaje` decimal(5,2) NOT NULL DEFAULT 0.00,
   `dia_facturacion` tinyint(2) NOT NULL DEFAULT 1,
@@ -403,6 +432,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `contratos`
+--
+
 DROP TABLE IF EXISTS `contratos`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -420,7 +454,7 @@ CREATE TABLE `contratos` (
   KEY `fk_contrato_servicio` (`servicio_id`),
   CONSTRAINT `fk_contrato_servicio` FOREIGN KEY (`servicio_id`) REFERENCES `servicios` (`id`),
   CONSTRAINT `chk_contrato_fechas` CHECK (`fecha_fin` is null or `fecha_fin` >= `fecha_inicio`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -581,6 +615,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `direccion`
+--
+
 DROP TABLE IF EXISTS `direccion`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -596,7 +635,7 @@ CREATE TABLE `direccion` (
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_direccion_lat` CHECK (`latitud` is null or `latitud` between -90 and 90),
   CONSTRAINT `chk_direccion_lon` CHECK (`longitud` is null or `longitud` between -180 and 180)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -663,6 +702,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `direccion_servicio`
+--
+
 DROP TABLE IF EXISTS `direccion_servicio`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -678,7 +722,7 @@ CREATE TABLE `direccion_servicio` (
   PRIMARY KEY (`id`),
   CONSTRAINT `chk_dir_serv_lat` CHECK (`latitud` is null or `latitud` between -90 and 90),
   CONSTRAINT `chk_dir_serv_lon` CHECK (`longitud` is null or `longitud` between -180 and 180)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -745,6 +789,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `email_log`
+--
+
 DROP TABLE IF EXISTS `email_log`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -831,6 +880,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `email_plantillas`
+--
+
 DROP TABLE IF EXISTS `email_plantillas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -908,6 +962,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `equipos`
+--
+
 DROP TABLE IF EXISTS `equipos`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -940,7 +999,7 @@ CREATE TABLE `equipos` (
   CONSTRAINT `chk_equipo_mac` CHECK (`direccion_mac` regexp '^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$'),
   CONSTRAINT `chk_equipo_estado_servicio` CHECK (`estado_inventario` = 'stock' and `servicio_id` is null or `estado_inventario` = 'asignado' and `servicio_id` is not null or `estado_inventario` in ('devuelto','averiado','baja')),
   CONSTRAINT `chk_equipo_tipo_propiedad` CHECK (`tipo` = 'ONU' and `propiedad` = 'empresa' or `tipo` in ('COMBO','ROUTER'))
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1015,6 +1074,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `factura_lineas`
+--
+
 DROP TABLE IF EXISTS `factura_lineas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1103,6 +1167,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `facturas`
+--
+
 DROP TABLE IF EXISTS `facturas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1131,7 +1200,7 @@ CREATE TABLE `facturas` (
   CONSTRAINT `chk_facturas_periodo` CHECK (`periodo` regexp '^[0-9]{4}-[0-9]{2}$'),
   CONSTRAINT `chk_factura_moneda` CHECK (`moneda` in ('USD','VES')),
   CONSTRAINT `chk_factura_tasa` CHECK (`tasa_cambio` is null or `tasa_cambio` > 0)
-) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1246,6 +1315,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `metodos_pago`
+--
+
 DROP TABLE IF EXISTS `metodos_pago`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1321,6 +1395,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `modulos`
+--
+
 DROP TABLE IF EXISTS `modulos`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1391,6 +1470,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `naps`
+--
+
 DROP TABLE IF EXISTS `naps`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1411,7 +1495,7 @@ CREATE TABLE `naps` (
   CONSTRAINT `chk_nap_lat` CHECK (`latitud` between -90 and 90),
   CONSTRAINT `chk_nap_lon` CHECK (`longitud` between -180 and 180),
   CONSTRAINT `chk_nap_puertos` CHECK (`cantidad_puertos_max` > 0)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1482,6 +1566,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `nodos`
+--
+
 DROP TABLE IF EXISTS `nodos`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1498,7 +1587,7 @@ CREATE TABLE `nodos` (
   UNIQUE KEY `uq_nodo_nombre` (`nombre`),
   CONSTRAINT `chk_nodo_lat` CHECK (`latitud` between -90 and 90),
   CONSTRAINT `chk_nodo_lon` CHECK (`longitud` between -180 and 180)
-) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1565,6 +1654,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `notas_credito`
+--
+
 DROP TABLE IF EXISTS `notas_credito`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1653,6 +1747,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `notas_debito`
+--
+
 DROP TABLE IF EXISTS `notas_debito`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1741,6 +1840,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `notificaciones`
+--
+
 DROP TABLE IF EXISTS `notificaciones`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1761,7 +1865,7 @@ CREATE TABLE `notificaciones` (
   KEY `fk_notif_usuario` (`usuario_id`),
   CONSTRAINT `fk_notif_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
   CONSTRAINT `fk_notif_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1828,6 +1932,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `notificaciones_staff`
+--
+
 DROP TABLE IF EXISTS `notificaciones_staff`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1844,7 +1953,7 @@ CREATE TABLE `notificaciones_staff` (
   PRIMARY KEY (`id`),
   KEY `idx_notif_staff_usuario_estado` (`usuario_id`,`estado`),
   CONSTRAINT `fk_notif_staff_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1911,6 +2020,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `olts`
+--
+
 DROP TABLE IF EXISTS `olts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1929,7 +2043,7 @@ CREATE TABLE `olts` (
   KEY `fk_olt_nodo` (`nodo_id`),
   CONSTRAINT `fk_olt_nodo` FOREIGN KEY (`nodo_id`) REFERENCES `nodos` (`id`),
   CONSTRAINT `chk_olt_puertos` CHECK (`puertos_pon` > 0)
-) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -1996,6 +2110,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `paginas`
+--
+
 DROP TABLE IF EXISTS `paginas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2008,7 +2127,7 @@ CREATE TABLE `paginas` (
   UNIQUE KEY `uq_pagina_modulo` (`id`,`modulo_id`),
   KEY `fk_pagina_modulo` (`modulo_id`),
   CONSTRAINT `fk_pagina_modulo` FOREIGN KEY (`modulo_id`) REFERENCES `modulos` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2071,6 +2190,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `pagos`
+--
+
 DROP TABLE IF EXISTS `pagos`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2109,7 +2233,7 @@ CREATE TABLE `pagos` (
   CONSTRAINT `fk_pago_usuario` FOREIGN KEY (`usuario_valido_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `chk_pago_monto` CHECK (`monto` > 0),
   CONSTRAINT `chk_pago_tasa` CHECK (`tasa_cambio` is null or `tasa_cambio` > 0)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2220,6 +2344,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `pedido_asignaciones`
+--
+
 DROP TABLE IF EXISTS `pedido_asignaciones`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2239,7 +2368,7 @@ CREATE TABLE `pedido_asignaciones` (
   CONSTRAINT `fk_asig_asignador` FOREIGN KEY (`usuario_asignador_id`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_asig_pedido` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_asig_tecnico` FOREIGN KEY (`tecnico_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2306,6 +2435,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `pedido_materiales`
+--
+
 DROP TABLE IF EXISTS `pedido_materiales`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2323,7 +2457,7 @@ CREATE TABLE `pedido_materiales` (
   KEY `idx_material_equipo` (`equipo_id`),
   CONSTRAINT `fk_material_equipo` FOREIGN KEY (`equipo_id`) REFERENCES `equipos` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_material_pedido` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2390,6 +2524,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `pedidos`
+--
+
 DROP TABLE IF EXISTS `pedidos`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2420,7 +2559,7 @@ CREATE TABLE `pedidos` (
   CONSTRAINT `fk_pedido_creador` FOREIGN KEY (`usuario_creador_id`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_pedido_servicio` FOREIGN KEY (`servicio_id`) REFERENCES `servicios` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_pedido_tecnico` FOREIGN KEY (`tecnico_asignado_id`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2491,6 +2630,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `permisos`
+--
+
 DROP TABLE IF EXISTS `permisos`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2562,6 +2706,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `planes`
+--
+
 DROP TABLE IF EXISTS `planes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2581,7 +2730,7 @@ CREATE TABLE `planes` (
   CONSTRAINT `chk_plan_moneda` CHECK (`moneda` in ('USD','VES','COP','EUR')),
   CONSTRAINT `chk_plan_velocidad_bajada` CHECK (`velocidad_bajada_mbps` is null or `velocidad_bajada_mbps` > 0),
   CONSTRAINT `chk_plan_velocidad_subida` CHECK (`velocidad_subida_mbps` is null or `velocidad_subida_mbps` > 0)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2652,6 +2801,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `r_cliente_telefono`
+--
+
 DROP TABLE IF EXISTS `r_cliente_telefono`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2665,7 +2819,7 @@ CREATE TABLE `r_cliente_telefono` (
   KEY `idx_rct_telefono` (`telefono_id`),
   CONSTRAINT `fk_rct_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_rct_telefono` FOREIGN KEY (`telefono_id`) REFERENCES `telefono` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=41 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2728,6 +2882,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `rol`
+--
+
 DROP TABLE IF EXISTS `rol`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2737,7 +2896,7 @@ CREATE TABLE `rol` (
   `descripcion` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `nombre_rol` (`nombre_rol`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2800,6 +2959,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `rol_modulo`
+--
+
 DROP TABLE IF EXISTS `rol_modulo`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2814,7 +2978,7 @@ CREATE TABLE `rol_modulo` (
   KEY `fk_rm_modulo` (`modulo_id`),
   CONSTRAINT `fk_rm_modulo` FOREIGN KEY (`modulo_id`) REFERENCES `modulos` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_rm_rol` FOREIGN KEY (`rol_id`) REFERENCES `rol` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2877,6 +3041,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `rol_modulo_pagina`
+--
+
 DROP TABLE IF EXISTS `rol_modulo_pagina`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2890,7 +3059,7 @@ CREATE TABLE `rol_modulo_pagina` (
   KEY `fk_rmpag_pagina` (`pagina_id`),
   CONSTRAINT `fk_rmpag_pagina` FOREIGN KEY (`pagina_id`) REFERENCES `paginas` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_rmpag_rolmodulo` FOREIGN KEY (`rol_modulo_id`) REFERENCES `rol_modulo` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=1681 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2419 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -2953,6 +3122,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `rol_modulo_permiso`
+--
+
 DROP TABLE IF EXISTS `rol_modulo_permiso`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -2974,7 +3148,7 @@ CREATE TABLE `rol_modulo_permiso` (
   CONSTRAINT `fk_rmp_permiso` FOREIGN KEY (`permiso_id`) REFERENCES `permisos` (`id`),
   CONSTRAINT `fk_rmp_rolmodulo` FOREIGN KEY (`rol_modulo_id`) REFERENCES `rol_modulo` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_rmp_rolmodulo_modulo` FOREIGN KEY (`rol_modulo_id`, `modulo_id`) REFERENCES `rol_modulo` (`id`, `modulo_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8511 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11110 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3041,6 +3215,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `servicios`
+--
+
 DROP TABLE IF EXISTS `servicios`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3063,7 +3242,7 @@ CREATE TABLE `servicios` (
   CONSTRAINT `fk_srv_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
   CONSTRAINT `fk_srv_nap` FOREIGN KEY (`nap_id`) REFERENCES `naps` (`id`),
   CONSTRAINT `fk_srv_plan` FOREIGN KEY (`plan_id`) REFERENCES `planes` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3178,6 +3357,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `sesiones`
+--
+
 DROP TABLE IF EXISTS `sesiones`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3204,7 +3388,7 @@ CREATE TABLE `sesiones` (
   CONSTRAINT `chk_sesiones_discriminador` CHECK (`tipo_usuario` = 'staff' and `usuario_id` is not null and `credencial_id` is null or `tipo_usuario` = 'cliente' and `credencial_id` is not null and `usuario_id` is null),
   CONSTRAINT `chk_sesiones_un_tipo` CHECK (`usuario_id` is not null and `credencial_id` is null or `usuario_id` is null and `credencial_id` is not null),
   CONSTRAINT `chk_sesion_expira` CHECK (`expira_en` > `creado_en`)
-) ENGINE=InnoDB AUTO_INCREMENT=284 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=711 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3271,6 +3455,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `sla_definiciones`
+--
+
 DROP TABLE IF EXISTS `sla_definiciones`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3285,7 +3474,7 @@ CREATE TABLE `sla_definiciones` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_sla_categoria_prioridad` (`categoria_id`,`prioridad`),
   CONSTRAINT `fk_sla_categoria` FOREIGN KEY (`categoria_id`) REFERENCES `categorias_ticket` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3352,6 +3541,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `tareas`
+--
+
 DROP TABLE IF EXISTS `tareas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3376,7 +3570,7 @@ CREATE TABLE `tareas` (
   CONSTRAINT `fk_tarea_servicio` FOREIGN KEY (`servicio_id`) REFERENCES `servicios` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tarea_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_tarea_usuario` FOREIGN KEY (`usuario_creador_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3447,6 +3641,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `telefono`
+--
+
 DROP TABLE IF EXISTS `telefono`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3456,7 +3655,7 @@ CREATE TABLE `telefono` (
   `creado_en` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_telefono_numero` (`numero`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3519,6 +3718,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `ticket_respuestas`
+--
+
 DROP TABLE IF EXISTS `ticket_respuestas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3539,7 +3743,7 @@ CREATE TABLE `ticket_respuestas` (
   CONSTRAINT `fk_respuesta_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_respuesta_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `chk_ticket_respuestas_discriminador` CHECK (`tipo_autor` = 'staff' and `usuario_id` is not null and `credencial_id` is null or `tipo_autor` = 'cliente' and `credencial_id` is not null and `usuario_id` is null)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3606,6 +3810,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `tickets`
+--
+
 DROP TABLE IF EXISTS `tickets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3634,7 +3843,7 @@ CREATE TABLE `tickets` (
   CONSTRAINT `fk_ticket_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
   CONSTRAINT `fk_ticket_servicio` FOREIGN KEY (`servicio_id`) REFERENCES `servicios` (`id`),
   CONSTRAINT `fk_ticket_usuario` FOREIGN KEY (`usuario_creador_id`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3653,6 +3862,26 @@ DELIMITER ;;
   END IF;
   IF horas IS NOT NULL THEN
     SET NEW.sla_vence_en = DATE_ADD(NOW(), INTERVAL horas HOUR);
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = cp850 */ ;
+/*!50003 SET character_set_results = cp850 */ ;
+/*!50003 SET collation_connection  = cp850_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_tickets_validar_insert BEFORE INSERT ON tickets FOR EACH ROW BEGIN
+  IF NEW.estado <> 'Abierto' THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'INSERT de ticket solo permite estado Abierto. Use UPDATE para transicionar.';
   END IF;
 END */;;
 DELIMITER ;
@@ -3720,6 +3949,30 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_tickets_validar_transicion BEFORE UPDATE ON tickets FOR EACH ROW BEGIN
+  DECLARE msg VARCHAR(255);
+  IF NEW.estado <> OLD.estado AND NOT EXISTS (
+    SELECT 1 FROM transicion_estado
+     WHERE tabla = 'tickets' AND estado_origen = OLD.estado AND estado_destino = NEW.estado
+  ) THEN
+    SET msg = CONCAT('Transicion no permitida en tickets: ', OLD.estado, ' -> ', NEW.estado);
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = msg;
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = cp850 */ ;
+/*!50003 SET character_set_results = cp850 */ ;
+/*!50003 SET collation_connection  = cp850_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
 /*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_tickets_audit_update AFTER UPDATE ON tickets FOR EACH ROW BEGIN
   INSERT INTO auditoria_logs (accion, tabla_afectada, id_registro_afectado, tipo_actor, usuario_id, credencial_id, old_value, new_value)
   VALUES ('UPDATE','tickets',NEW.id,
@@ -3758,6 +4011,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `transicion_estado`
+--
+
 DROP TABLE IF EXISTS `transicion_estado`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3769,7 +4027,7 @@ CREATE TABLE `transicion_estado` (
   `descripcion` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_transicion` (`tabla`,`estado_origen`,`estado_destino`)
-) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3832,6 +4090,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `usuario_rol`
+--
+
 DROP TABLE IF EXISTS `usuario_rol`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3845,7 +4108,7 @@ CREATE TABLE `usuario_rol` (
   KEY `fk_ur_rol` (`rol_id`),
   CONSTRAINT `fk_ur_rol` FOREIGN KEY (`rol_id`) REFERENCES `rol` (`id`),
   CONSTRAINT `fk_ur_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3908,6 +4171,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Table structure for table `usuarios`
+--
+
 DROP TABLE IF EXISTS `usuarios`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -3924,7 +4192,7 @@ CREATE TABLE `usuarios` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `uq_usuario_email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -3993,6 +4261,11 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Temporary table structure for view `v_clientes_360`
+--
+
 DROP TABLE IF EXISTS `v_clientes_360`;
 /*!50001 DROP VIEW IF EXISTS `v_clientes_360`*/;
 SET @saved_cs_client     = @@character_set_client;
@@ -4010,6 +4283,11 @@ SET character_set_client = utf8;
   1 AS `facturas_vencidas`,
   1 AS `ultima_actividad` */;
 SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `v_equipos_asignados`
+--
+
 DROP TABLE IF EXISTS `v_equipos_asignados`;
 /*!50001 DROP VIEW IF EXISTS `v_equipos_asignados`*/;
 SET @saved_cs_client     = @@character_set_client;
@@ -4033,6 +4311,11 @@ SET character_set_client = utf8;
   1 AS `cliente_id`,
   1 AS `cliente` */;
 SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `v_estado_cuenta_cliente`
+--
+
 DROP TABLE IF EXISTS `v_estado_cuenta_cliente`;
 /*!50001 DROP VIEW IF EXISTS `v_estado_cuenta_cliente`*/;
 SET @saved_cs_client     = @@character_set_client;
@@ -4047,6 +4330,11 @@ SET character_set_client = utf8;
   1 AS `facturas_pagadas`,
   1 AS `ultima_fecha_vencimiento` */;
 SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `v_facturas_con_saldo`
+--
+
 DROP TABLE IF EXISTS `v_facturas_con_saldo`;
 /*!50001 DROP VIEW IF EXISTS `v_facturas_con_saldo`*/;
 SET @saved_cs_client     = @@character_set_client;
@@ -4066,6 +4354,19 @@ SET character_set_client = utf8;
   1 AS `cliente`,
   1 AS `cedula` */;
 SET character_set_client = @saved_cs_client;
+
+--
+-- Dumping events for database 'bd_redytelca'
+--
+
+--
+-- Dumping routines for database 'bd_redytelca'
+--
+
+--
+-- Final view structure for view `v_clientes_360`
+--
+
 /*!50001 DROP VIEW IF EXISTS `v_clientes_360`*/;
 /*!50001 SET @saved_cs_client          = @@character_set_client */;
 /*!50001 SET @saved_cs_results         = @@character_set_results */;
@@ -4079,6 +4380,11 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `v_equipos_asignados`
+--
+
 /*!50001 DROP VIEW IF EXISTS `v_equipos_asignados`*/;
 /*!50001 SET @saved_cs_client          = @@character_set_client */;
 /*!50001 SET @saved_cs_results         = @@character_set_results */;
@@ -4092,6 +4398,11 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `v_estado_cuenta_cliente`
+--
+
 /*!50001 DROP VIEW IF EXISTS `v_estado_cuenta_cliente`*/;
 /*!50001 SET @saved_cs_client          = @@character_set_client */;
 /*!50001 SET @saved_cs_results         = @@character_set_results */;
@@ -4105,6 +4416,11 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `v_facturas_con_saldo`
+--
+
 /*!50001 DROP VIEW IF EXISTS `v_facturas_con_saldo`*/;
 /*!50001 SET @saved_cs_client          = @@character_set_client */;
 /*!50001 SET @saved_cs_results         = @@character_set_results */;
@@ -4128,3 +4444,109 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+-- Dump completed on 2026-11-01 16:53:50
+-- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
+--
+-- Host: localhost    Database: bd_redytelca
+-- ------------------------------------------------------
+-- Server version	10.4.32-MariaDB
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Dumping data for table `rol`
+--
+
+LOCK TABLES `rol` WRITE;
+/*!40000 ALTER TABLE `rol` DISABLE KEYS */;
+INSERT INTO `rol` VALUES (1,'Administrador',NULL),(2,'Operador',NULL),(23,'Técnico','Personal de campo. Cierra pedidos y asigna equipos al servicio.'),(24,'a',NULL);
+/*!40000 ALTER TABLE `rol` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `modulos`
+--
+
+LOCK TABLES `modulos` WRITE;
+/*!40000 ALTER TABLE `modulos` DISABLE KEYS */;
+INSERT INTO `modulos` VALUES (1,'Principal'),(2,'Clientes'),(3,'Operación'),(4,'Configuración'),(5,'Reportes'),(6,'Infraestructura'),(7,'Finanzas');
+/*!40000 ALTER TABLE `modulos` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `paginas`
+--
+
+LOCK TABLES `paginas` WRITE;
+/*!40000 ALTER TABLE `paginas` DISABLE KEYS */;
+INSERT INTO `paginas` VALUES (1,'Inicio','dash',1),(2,'Gestión de clientes','clientes',2),(4,'Control de tareas','tareas',3),(5,'Tickets','tickets',3),(6,'Mapa','mapa',3),(7,'Usuarios','usuarios',4),(8,'Permisos','permisos',4),(9,'Cambiar contraseña','password',4),(10,'Roles','roles',4),(11,'Reportes','reportes',5),(12,'Nodos','nodos',6),(13,'OLTs','olts',6),(14,'NAPs','naps',6),(15,'Facturación','facturas',7),(16,'Pagos','pagos',7),(17,'Planes','planes',7),(18,'Contratos','contratos',7),(19,'Notificaciones','notificaciones',3),(20,'Equipos','equipos',6),(21,'Configuración de empresa','empresa',4),(22,'Servicios','servicios',2),(23,'Pedidos de campo','pedidos',3),(24,'Auditoría','auditoria',4);
+/*!40000 ALTER TABLE `paginas` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `permisos`
+--
+
+LOCK TABLES `permisos` WRITE;
+/*!40000 ALTER TABLE `permisos` DISABLE KEYS */;
+INSERT INTO `permisos` VALUES (2,'crear'),(3,'editar'),(4,'eliminar'),(1,'leer'),(5,'validar');
+/*!40000 ALTER TABLE `permisos` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `rol_modulo`
+--
+
+LOCK TABLES `rol_modulo` WRITE;
+/*!40000 ALTER TABLE `rol_modulo` DISABLE KEYS */;
+INSERT INTO `rol_modulo` VALUES (8,1,1),(9,1,2),(10,1,3),(11,1,4),(12,1,5),(13,1,6),(14,1,7),(1,2,1),(2,2,2),(3,2,3),(5,2,5),(6,2,6),(7,2,7),(28,23,1),(29,23,2),(25,23,3),(30,23,5),(26,23,6),(31,23,7);
+/*!40000 ALTER TABLE `rol_modulo` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `rol_modulo_pagina`
+--
+
+LOCK TABLES `rol_modulo_pagina` WRITE;
+/*!40000 ALTER TABLE `rol_modulo_pagina` DISABLE KEYS */;
+INSERT INTO `rol_modulo_pagina` VALUES (2165,28,1,1),(2166,29,2,2),(2167,29,2,22),(2168,25,3,5),(2169,25,3,6),(2170,25,3,23),(2171,30,5,11),(2172,26,6,12),(2173,26,6,13),(2174,26,6,14),(2175,26,6,20),(2176,31,7,17),(2240,1,1,1),(2241,2,2,2),(2242,2,2,22),(2243,3,3,4),(2244,3,3,5),(2245,3,3,6),(2246,3,3,23),(2247,5,5,11),(2248,6,6,12),(2249,6,6,13),(2250,6,6,14),(2251,6,6,20),(2252,7,7,15),(2253,7,7,16),(2254,7,7,17),(2255,7,7,18),(2393,8,1,1),(2394,9,2,2),(2395,9,2,22),(2396,10,3,4),(2397,10,3,5),(2398,10,3,6),(2399,10,3,23),(2400,11,4,7),(2401,11,4,8),(2402,11,4,9),(2403,11,4,10),(2404,11,4,21),(2405,11,4,24),(2406,12,5,11),(2407,13,6,12),(2408,13,6,13),(2409,13,6,14),(2410,13,6,20),(2411,14,7,15),(2412,14,7,16),(2413,14,7,17),(2414,14,7,18),(2416,10,3,19),(2417,3,3,19),(2418,25,3,19);
+/*!40000 ALTER TABLE `rol_modulo_pagina` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `rol_modulo_permiso`
+--
+
+LOCK TABLES `rol_modulo_permiso` WRITE;
+/*!40000 ALTER TABLE `rol_modulo_permiso` DISABLE KEYS */;
+INSERT INTO `rol_modulo_permiso` VALUES (10271,28,1,1,1),(10272,28,1,1,2),(10273,28,1,1,3),(10274,29,2,2,1),(10275,29,2,22,1),(10276,25,3,5,1),(10277,25,3,5,2),(10278,25,3,5,3),(10279,25,3,6,1),(10280,25,3,6,2),(10281,25,3,6,3),(10282,25,3,23,1),(10283,25,3,23,2),(10284,25,3,23,3),(10285,25,3,23,4),(10286,30,5,11,1),(10287,30,5,11,2),(10288,30,5,11,3),(10289,26,6,12,1),(10290,26,6,12,2),(10291,26,6,12,3),(10292,26,6,13,1),(10293,26,6,13,2),(10294,26,6,13,3),(10295,26,6,14,1),(10296,26,6,14,2),(10297,26,6,14,3),(10298,26,6,20,1),(10299,26,6,20,2),(10300,26,6,20,3),(10301,31,7,17,1),(10302,31,7,17,2),(10303,31,7,17,3),(10535,1,1,1,1),(10536,1,1,1,2),(10537,1,1,1,3),(10538,2,2,2,1),(10539,2,2,2,2),(10540,2,2,2,3),(10541,2,2,22,1),(10542,2,2,22,2),(10543,2,2,22,3),(10544,3,3,4,1),(10545,3,3,4,2),(10546,3,3,4,3),(10547,3,3,5,1),(10548,3,3,5,2),(10549,3,3,5,3),(10550,3,3,6,1),(10551,3,3,6,2),(10552,3,3,6,3),(10553,3,3,23,1),(10554,3,3,23,2),(10555,3,3,23,3),(10556,5,5,11,1),(10557,5,5,11,2),(10558,5,5,11,3),(10559,6,6,12,1),(10560,6,6,12,2),(10561,6,6,12,3),(10562,6,6,13,1),(10563,6,6,13,2),(10564,6,6,13,3),(10565,6,6,14,1),(10566,6,6,14,2),(10567,6,6,14,3),(10568,6,6,20,1),(10569,6,6,20,2),(10570,6,6,20,3),(10571,7,7,15,1),(10572,7,7,15,2),(10573,7,7,15,3),(10574,7,7,16,1),(10575,7,7,16,2),(10576,7,7,16,3),(10577,7,7,17,1),(10578,7,7,17,2),(10579,7,7,17,3),(10580,7,7,18,1),(10581,7,7,18,2),(10582,7,7,18,3),(11028,8,1,1,1),(11029,9,2,2,1),(11030,9,2,2,2),(11031,9,2,2,3),(11032,9,2,2,4),(11033,9,2,22,1),(11034,9,2,22,2),(11035,9,2,22,3),(11036,9,2,22,4),(11037,10,3,4,1),(11038,10,3,4,2),(11039,10,3,4,3),(11040,10,3,4,4),(11041,10,3,5,1),(11042,10,3,5,2),(11043,10,3,5,3),(11044,10,3,5,4),(11045,10,3,6,1),(11046,10,3,23,1),(11047,10,3,23,2),(11048,10,3,23,3),(11049,10,3,23,4),(11050,11,4,7,1),(11051,11,4,7,2),(11052,11,4,7,3),(11053,11,4,7,4),(11054,11,4,8,1),(11055,11,4,8,2),(11056,11,4,8,3),(11057,11,4,8,4),(11058,11,4,9,1),(11059,11,4,9,3),(11060,11,4,10,1),(11061,11,4,10,2),(11062,11,4,10,3),(11063,11,4,10,4),(11064,11,4,21,1),(11065,11,4,21,3),(11066,11,4,24,1),(11067,12,5,11,1),(11068,13,6,12,1),(11069,13,6,12,2),(11070,13,6,12,3),(11071,13,6,12,4),(11072,13,6,13,1),(11073,13,6,13,2),(11074,13,6,13,3),(11075,13,6,13,4),(11076,13,6,14,1),(11077,13,6,14,2),(11078,13,6,14,3),(11079,13,6,14,4),(11080,13,6,20,1),(11081,13,6,20,2),(11082,13,6,20,3),(11083,13,6,20,4),(11084,14,7,15,1),(11085,14,7,15,2),(11086,14,7,15,3),(11087,14,7,15,4),(11088,14,7,16,1),(11089,14,7,16,2),(11090,14,7,16,3),(11091,14,7,16,4),(11092,14,7,17,1),(11093,14,7,17,2),(11094,14,7,17,3),(11095,14,7,17,4),(11096,14,7,18,1),(11097,14,7,18,2),(11098,14,7,18,3),(11099,14,7,18,4),(11102,10,3,19,1),(11103,10,3,19,3),(11104,3,3,19,1),(11105,3,3,19,2),(11106,3,3,19,3),(11107,25,3,19,1),(11108,25,3,19,2),(11109,25,3,19,3);
+/*!40000 ALTER TABLE `rol_modulo_permiso` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Dumping data for table `configuracion_empresa`
+--
+
+LOCK TABLES `configuracion_empresa` WRITE;
+/*!40000 ALTER TABLE `configuracion_empresa` DISABLE KEYS */;
+INSERT INTO `configuracion_empresa` VALUES (1,'REDYTELCA','uploads/empresa/logo_login.png','uploads/empresa/logo_sidebar.svg','#0c5dcf',0.00,1,5,0.00,10,'2026-10-12 19:38:26','2026-10-31 10:34:09');
+/*!40000 ALTER TABLE `configuracion_empresa` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2026-11-01 16:53:55

@@ -22,6 +22,15 @@ final class AuthService extends BaseService
     private const ID_ROL_ADMIN = 1;
     private const ID_MODULO_CONFIG = 4;
 
+    /**
+     * Hash bcrypt válido usado para igualar el tiempo de respuesta
+     * cuando el username no existe (mitigación de timing oracle).
+     * No corresponde a ninguna contraseña conocida. password_verify()
+     * contra este hash siempre devuelve false, pero consume el tiempo
+     * de bcrypt, igualando el path "usuario existe".
+     */
+    private const DUMMY_BCRYPT_HASH = '$2y$10$3F914JmsON9GvY8A2Y6pxuV1/Yap2xLDhc0L9BUFvEK/.9v9pz3Im';
+
     /** @var UsuarioRepository */
     private UsuarioRepository $usuarioRepo;
 
@@ -62,6 +71,10 @@ final class AuthService extends BaseService
     {
         $usuario = $this->usuarioRepo->findByUsername($username);
         if (!$usuario) {
+            // Mitigación de timing oracle: ejecutar password_verify contra
+            // un hash dummy válido para que el tiempo de respuesta sea
+            // indistinguible del path "usuario existe".
+            password_verify($password, self::DUMMY_BCRYPT_HASH);
             throw new AuthenticationException('Usuario o contraseña incorrectos.');
         }
 

@@ -17,9 +17,9 @@ try {
         Auth::requireOperation($pdo, 'tareas', 'leer');
         $controller->index();
     } elseif ($method === 'POST') {
-        Auth::requirePageAccess($pdo, 'tareas');
+        $staffSession = Auth::requirePageAccess($pdo, 'tareas');
         Auth::requireOperation($pdo, 'tareas', 'crear');
-        $controller->store();
+        $controller->store($staffSession);
     } elseif ($method === 'PUT') {
         Auth::requirePageAccess($pdo, 'tareas');
         Auth::requireOperation($pdo, 'tareas', 'editar');

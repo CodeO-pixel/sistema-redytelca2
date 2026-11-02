@@ -17,35 +17,45 @@ use App\Repositories\ModuloRepository;
 
 /**
  * Servicio para la gestión de permisos.
+ *
+ * Fase 4.3: la matriz expone permisos_aplicables por vista.
  */
 final class PermisoService extends BaseService
 {
-    /** @var PermisoRepository */
+    private const PERMISOS_POR_PAGINA = [
+        'dash'           => [1],
+        'clientes'       => [1, 2, 3, 4],
+        'servicios'      => [1, 2, 3, 4],
+        'tareas'         => [1, 2, 3, 4],
+        'tickets'        => [1, 2, 3, 4],
+        'mapa'           => [1],
+        'reportes'       => [1],
+        'nodos'          => [1, 2, 3, 4],
+        'olts'           => [1, 2, 3, 4],
+        'naps'           => [1, 2, 3, 4],
+        'equipos'        => [1, 2, 3, 4],
+        'facturas'       => [1, 2, 3, 4],
+        'pagos'          => [1, 2, 3, 4, 5],
+        'planes'         => [1, 2, 3, 4],
+        'contratos'      => [1, 2, 3, 4],
+        'pedidos'        => [1, 2, 3, 4],
+        'notificaciones' => [1, 3],
+        'usuarios'       => [1, 2, 3, 4],
+        'roles'          => [1, 2, 3, 4],
+        'permisos'       => [1, 2, 3, 4],
+        'password'       => [1, 3],
+        'empresa'        => [1, 3],
+        'auditoria'      => [1],
+    ];
+
     private PermisoRepository $permisoRepo;
-
-    /** @var RolRepository */
     private RolRepository $rolRepo;
-
-    /** @var PaginaRepository */
     private PaginaRepository $paginaRepo;
-
-    /** @var RolModuloRepository */
     private RolModuloRepository $rolModuloRepo;
-
-    /** @var RolModuloPaginaRepository */
     private RolModuloPaginaRepository $rolModuloPaginaRepo;
-
-    /** @var RolModuloPermisoRepository */
     private RolModuloPermisoRepository $rolModuloPermisoRepo;
-
-    /** @var ModuloRepository */
     private ModuloRepository $moduloRepo;
 
-    /**
-     * Constructor del servicio.
-     *
-     * @param \PDO $pdo
-     */
     public function __construct(\PDO $pdo)
     {
         parent::__construct($pdo);
@@ -58,115 +68,54 @@ final class PermisoService extends BaseService
         $this->moduloRepo = new ModuloRepository($pdo);
     }
 
-    /**
-     * Crea un nuevo permiso.
-     *
-     * @param array $datos
-     * @return int
-     * @throws ConflictException
-     */
     public function crear(array $datos): int
     {
         if (isset($datos['nombre']) && $this->permisoRepo->findByNombre($datos['nombre'])) {
             throw new ConflictException('Ya existe un permiso con ese nombre.');
         }
-
         return $this->permisoRepo->create($datos);
     }
 
-    /**
-     * Actualiza un permiso existente.
-     *
-     * @param int $id
-     * @param array $datos
-     * @return void
-     * @throws NotFoundException
-     * @throws ConflictException
-     */
     public function actualizar(int $id, array $datos): void
     {
         if (!$this->permisoRepo->exists($id)) {
             throw new NotFoundException('Permiso no encontrado.');
         }
-
         if (isset($datos['nombre'])) {
             $existente = $this->permisoRepo->findByNombre($datos['nombre']);
             if ($existente && (int) $existente['id'] !== $id) {
                 throw new ConflictException('Ya existe otro permiso con ese nombre.');
             }
         }
-
         $this->permisoRepo->update($id, $datos);
     }
 
-    /**
-     * Elimina un permiso si no está asignado a ningún rol.
-     *
-     * @param int $id
-     * @return void
-     * @throws NotFoundException
-     * @throws DomainException
-     */
     public function eliminar(int $id): void
     {
         if (!$this->permisoRepo->exists($id)) {
             throw new NotFoundException('Permiso no encontrado.');
         }
-
         if ($this->rolModuloPermisoRepo->countByPermisoId($id) > 0) {
             throw new DomainException('El permiso está asignado a roles; quítalo antes de eliminarlo.');
         }
-
         $this->permisoRepo->delete($id);
     }
 
-    /**
-     * Busca un permiso por su ID.
-     *
-     * @param int $id
-     * @return array|null
-     */
     public function buscarPorId(int $id): ?array
     {
         return $this->permisoRepo->findById($id);
     }
 
-    /**
-     * Busca un permiso por su nombre.
-     *
-     * @param string $nombre
-     * @return array|null
-     */
     public function buscarPorNombre(string $nombre): ?array
     {
         return $this->permisoRepo->findByNombre($nombre);
     }
 
-    /**
-     * Obtiene todos los permisos ordenados por ID.
-     *
-     * @return array
-     */
     public function listar(): array
     {
         return $this->permisoRepo->findAllOrderedById();
     }
 
-    /**
-     * Guarda la matriz de permisos de un rol en una transacción.
-     *
-     * Reemplaza la lógica inline de permisos_guardar.php (versión pre-139d).
-     * Escribe en rol_modulo, rol_modulo_pagina y rol_modulo_permiso.
-     *
-     * Los permisos se insertan SIEMPRE, independiente de 'visible'.
-     * Desmarcar visibilidad deja los permisos inertes: requirePageAccess
-     * rechaza antes de llegar a requireOperation (ADR 008).
-     *
-     * @param int $idRol
-     * @param array $paginas Array de ['id_pagina' => int, 'visible' => bool, 'permisos' => int[]]
-     * @return void
-     * @throws NotFoundException
-     */
     public function guardarMatriz(int $idRol, array $paginas): void
     {
         if ($idRol <= 0) {
@@ -212,16 +161,6 @@ final class PermisoService extends BaseService
         });
     }
 
-    /**
-     * Devuelve la matriz de permisos de un rol: módulos con páginas,
-     * visibilidad (rol_modulo_pagina) y permisos asignados
-     * (rol_modulo_permiso), más el catálogo de permisos.
-     *
-     * Reemplaza el SQL inline de permisos_listar.php (versión pre-139d).
-     *
-     * @param int $idRol
-     * @return array
-     */
     public function listarMatriz(int $idRol): array
     {
         $catalogo = $this->permisoRepo->findAllOrderedById();
@@ -260,21 +199,29 @@ final class PermisoService extends BaseService
             if (!isset($porModulo[$idModulo])) {
                 continue;
             }
+            $urlPag = (string) ($p['url_pagina'] ?? '');
+            $aplicables = self::PERMISOS_POR_PAGINA[$urlPag] ?? [1, 2, 3, 4];
+
             $permisosPag = [];
             foreach ($catalogo as $perm) {
                 $idPer = (int) $perm['id'];
+                if (!in_array($idPer, $aplicables, true)) {
+                    continue;
+                }
                 $permisosPag[] = [
                     'id_permiso' => $idPer,
                     'nombre' => $perm['nombre'],
                     'asignado' => isset($asignados[$idPag][$idPer])
                 ];
             }
+
             $porModulo[$idModulo]['vistas'][] = [
                 'id_pagina' => $idPag,
                 'nombre_pagina' => $p['nombre_pagina'],
-                'url_pagina' => $p['url_pagina'],
+                'url_pagina' => $urlPag,
                 'visible' => isset($visibles[$idPag]),
-                'permisos' => $permisosPag
+                'permisos' => $permisosPag,
+                'permisos_aplicables' => $aplicables
             ];
         }
 

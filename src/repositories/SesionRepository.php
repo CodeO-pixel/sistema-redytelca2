@@ -36,13 +36,6 @@ final class SesionRepository extends BaseRepository
      *
      * Filtra por expira_en > NOW() y revocado_en IS NULL.
      *
-     * NOTA: este filtro es más estricto que el de requireStaffAuth /
-     * requireClientAuth (core/Auth.php), que solo validan
-     * expira_en > NOW() sin mirar revocado_en. El service de auth
-     * (spec 137) debe decidir explícitamente si alinearse con este
-     * repo o con los endpoints viejos. En el flujo actual no hay
-     * divergencia porque logout setea ambos campos a la vez.
-     *
      * @param string $token
      * @return array|null
      */
@@ -137,6 +130,44 @@ final class SesionRepository extends BaseRepository
     {
         $sql = "UPDATE {$this->table} SET expira_en = GREATEST(UTC_TIMESTAMP(), DATE_ADD(creado_en, INTERVAL 1 SECOND)), revocado_en = UTC_TIMESTAMP(), motivo_cierre = 'revocada_por_admin' WHERE usuario_id = ? AND revocado_en IS NULL";
         $stmt = $this->prepareAndExecute($sql, [$usuarioId]);
+        return $stmt->rowCount();
+    }
+
+    /**
+     * Revoca TODAS las sesiones no revocadas de una credencial de cliente.
+     *
+     * Se usa al cambiar o resetear la contraseña del cliente (OWASP ASVS
+     * V7.4.3). Equivalente a revocarTodasByUsuarioId pero filtrando por
+     * credencial_id en lugar de usuario_id.
+     *
+     * GREATEST evita violar chk_sesion_expira (CHECK expira_en > creado_en)
+     * cuando la sesión fue creada en el mismo segundo que el cambio de
+     * contraseña.
+     *
+     * @param int $credencialId
+     * @return int Número de sesiones revocadas.
+     */
+    public function revocarTodasByCredencialId(int $credencialId): int
+    {
+        $sql = "UPDATE {$this->table} SET expira_en = GREATEST(UTC_TIMESTAMP(), DATE_ADD(creado_en, INTERVAL 1 SECOND)), revocado_en = UTC_TIMESTAMP(), motivo_cierre = 'cambio_password' WHERE credencial_id = ? AND revocado_en IS NULL";
+        $stmt = $this->prepareAndExecute($sql, [$credencialId]);
+        return $stmt->rowCount();
+    }
+
+    /**
+     * Elimina las sesiones expiradas de una credencial de cliente.
+     *
+     * Limpieza que se ejecuta al login, igual que deleteExpiradasByUsuarioId
+     * para staff. Evita que la tabla sesiones crezca indefinidamente.
+     *
+     * @param int $credencialId
+     * @param int $dias
+     * @return int
+     */
+    public function deleteExpiradasByCredencialId(int $credencialId, int $dias): int
+    {
+        $sql = "DELETE FROM {$this->table} WHERE credencial_id = ? AND expira_en < DATE_SUB(NOW(), INTERVAL ? DAY)";
+        $stmt = $this->prepareAndExecute($sql, [$credencialId, $dias]);
         return $stmt->rowCount();
     }
 }

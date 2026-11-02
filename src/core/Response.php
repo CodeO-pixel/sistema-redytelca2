@@ -92,6 +92,10 @@ final class Response
                 // SIGNAL SQLSTATE '45000' de los triggers de transición.
                 // errorInfo[2] trae el mensaje de negocio del trigger.
                 self::error($e->errorInfo[2] ?: 'Transición no permitida.', 422);
+            } elseif ($sqlState === 4025) {
+                // Violación de CHECK constraint en MariaDB.
+                // errorInfo[2] trae el mensaje del CHECK.
+                self::error($e->errorInfo[2] ?: 'Violación de restricción CHECK.', 422);
             } else {
                 self::error('Error de base de datos.', 500);
             }

@@ -13,6 +13,7 @@ use App\Repositories\NapRepository;
 use App\Repositories\ContratoRepository;
 use App\Repositories\FacturaRepository;
 use App\Repositories\EquipoRepository;
+use App\Repositories\DireccionServicioRepository;
 
 /**
  * Servicio para la gestión de servicios de clientes.
@@ -40,6 +41,9 @@ final class ServicioService extends BaseService
     /** @var EquipoRepository */
     private EquipoRepository $equipoRepo;
 
+    /** @var DireccionServicioRepository */
+    private DireccionServicioRepository $direccionServicioRepo;
+
     /**
      * Constructor del servicio.
      *
@@ -55,6 +59,7 @@ final class ServicioService extends BaseService
         $this->contratoRepo = new ContratoRepository($pdo);
         $this->facturaRepo = new FacturaRepository($pdo);
         $this->equipoRepo = new EquipoRepository($pdo);
+        $this->direccionServicioRepo = new DireccionServicioRepository($pdo);
     }
 
     /**
@@ -84,6 +89,49 @@ final class ServicioService extends BaseService
     }
 
     /**
+     * Actualiza la dirección de un servicio.
+     *
+     * @param int $servicioId
+     * @param array $datosDireccion
+     * @return void
+     */
+    public function actualizarDireccion(int $servicioId, array $datosDireccion): void
+    {
+        $calle = trim($datosDireccion['calle'] ?? '');
+        $latRaw = $datosDireccion['latitud'] ?? null;
+        $lonRaw = $datosDireccion['longitud'] ?? null;
+
+        if ($calle === '' && $latRaw === null && $lonRaw === null) {
+            return;
+        }
+
+        $lat = $latRaw !== null ? (float) str_replace(',', '.', (string) $latRaw) : null;
+        $lon = $lonRaw !== null ? (float) str_replace(',', '.', (string) $lonRaw) : null;
+
+        $servicio = $this->servicioRepo->findById($servicioId);
+        if (!$servicio) {
+            return;
+        }
+
+        $dirId = $servicio['direccion_id'] ? (int) $servicio['direccion_id'] : null;
+
+        if ($dirId) {
+            $this->direccionServicioRepo->update($dirId, [
+                'calle' => $calle ?: null,
+                'latitud' => $lat,
+                'longitud' => $lon
+            ]);
+        } else {
+            $newDirId = $this->direccionServicioRepo->create([
+                'calle' => $calle ?: null,
+                'latitud' => $lat,
+                'longitud' => $lon
+            ]);
+            $this->servicioRepo->update($servicioId, ['direccion_id' => $newDirId]);
+        }
+    }
+
+    /**
      * Actualiza un servicio existente.
      *
      * @param int $id
@@ -98,6 +146,13 @@ final class ServicioService extends BaseService
             throw new NotFoundException('Servicio no encontrado.');
         }
 
+        $dirData = [
+            'calle' => $datos['direccion_texto'] ?? null,
+            'latitud' => $datos['latitud'] ?? null,
+            'longitud' => $datos['longitud'] ?? null,
+        ];
+        unset($datos['direccion_texto'], $datos['latitud'], $datos['longitud']);
+
         if (isset($datos['plan_id']) && !$this->planRepo->exists((int) $datos['plan_id'])) {
             throw new NotFoundException('Plan no encontrado.');
         }
@@ -106,7 +161,12 @@ final class ServicioService extends BaseService
             throw new NotFoundException('NAP no encontrada.');
         }
 
-        $this->servicioRepo->update($id, $datos);
+        $this->transaction(function() use ($id, $datos, $dirData) {
+            $this->actualizarDireccion($id, $dirData);
+            if (!empty($datos)) {
+                $this->servicioRepo->update($id, $datos);
+            }
+        });
     }
 
     /**

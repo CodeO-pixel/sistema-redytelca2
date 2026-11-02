@@ -7,6 +7,9 @@ use App\Core\BaseController;
 use App\Services\ServicioService;
 use App\Repositories\ServicioRepository;
 use App\Repositories\DireccionServicioRepository;
+use App\Validators\ServicioValidator;
+use App\Exceptions\NotFoundException;
+use App\Exceptions\ValidationException;
 
 /**
  * Controlador para la gestión de servicios.
@@ -57,38 +60,46 @@ final class ServicioController extends BaseController
     public function store(): void
     {
         $input = $this->input();
-        $idCliente = (int) ($input['id_cliente'] ?? 0);
+        $validated = ServicioValidator::validateCreate($input);
+
         $direccionTexto = trim($input['direccion_texto'] ?? '');
-
-        if ($idCliente <= 0 || $direccionTexto === '') {
-            $this->render(['status' => 'error', 'message' => 'Cliente y dirección del servicio son obligatorios'], 400);
-            return;
+        if ($direccionTexto === '') {
+            throw new ValidationException(['direccion_texto' => 'La dirección del servicio es obligatoria.']);
         }
-
-        $idPlan = isset($input['id_plan']) && $input['id_plan'] !== '' ? (int) $input['id_plan'] : 1;
-        $idNap = isset($input['id_naps']) && $input['id_naps'] !== '' ? (int) $input['id_naps'] : null;
 
         $latRaw = isset($input['latitud']) && $input['latitud'] !== '' ? $input['latitud'] : null;
         $lonRaw = isset($input['longitud']) && $input['longitud'] !== '' ? $input['longitud'] : null;
 
-        $lat = $latRaw !== null ? (float) str_replace(',', '.', (string) $latRaw) : null;
-        $lon = $lonRaw !== null ? (float) str_replace(',', '.', (string) $lonRaw) : null;
+        $lat = null;
+        if ($latRaw !== null) {
+            $latNorm = str_replace(',', '.', (string) $latRaw);
+            if (!is_numeric($latNorm)) {
+                throw new ValidationException(['latitud' => 'La latitud debe ser numérica (usa punto como separador decimal, ej. 10.4806).']);
+            }
+            $lat = (float) $latNorm;
+        }
 
-        if (($latRaw !== null && !is_numeric($lat)) || ($lonRaw !== null && !is_numeric($lon))) {
-            $this->render(['status' => 'error', 'message' => 'La latitud/longitud debe ser un número válido (usa punto como separador decimal, ej. 10.4806).'], 400);
-            return;
+        $lon = null;
+        if ($lonRaw !== null) {
+            $lonNorm = str_replace(',', '.', (string) $lonRaw);
+            if (!is_numeric($lonNorm)) {
+                throw new ValidationException(['longitud' => 'La longitud debe ser numérica (usa punto como separador decimal, ej. -66.9036).']);
+            }
+            $lon = (float) $lonNorm;
         }
 
         $dirId = $this->direccionServicioRepo->create([
-            'calle' => $direccionTexto ?: null,
+            'calle' => $direccionTexto,
             'latitud' => $lat,
             'longitud' => $lon
         ]);
 
         $this->servicioService->crear([
-            'cliente_id' => $idCliente,
-            'plan_id' => $idPlan,
-            'nap_id' => $idNap,
+            'cliente_id' => (int) $validated['cliente_id'],
+            'plan_id' => (int) $validated['plan_id'],
+            'nap_id' => isset($validated['nap_id']) && $validated['nap_id'] !== null && $validated['nap_id'] !== ''
+                ? (int) $validated['nap_id']
+                : null,
             'alias' => trim($input['alias'] ?? '') ?: null,
             'direccion_id' => $dirId,
             'estado_comercial' => 'pendiente'
@@ -100,31 +111,87 @@ final class ServicioController extends BaseController
     /**
      * Actualiza un servicio existente.
      *
+     * Partial update real: solo modifica los campos presentes en el body.
+     * Los campos ausentes conservan su valor actual.
+     *
      * @return void
      */
     public function update(): void
     {
         $input = $this->input();
         $id = (int) ($input['id_servicio'] ?? 0);
+        unset($input['id_servicio']);
 
         if ($id <= 0) {
-            $this->render(['status' => 'error', 'message' => 'Servicio inválido'], 400);
-            return;
+            throw new ValidationException(['id_servicio' => 'Servicio inválido.']);
         }
+
+        $servicioActual = $this->servicioService->buscarPorId($id);
+        if (!$servicioActual) {
+            throw new NotFoundException('Servicio no encontrado.');
+        }
+
+        $validated = ServicioValidator::validateUpdate($input);
 
         $direccionTexto = trim($input['direccion_texto'] ?? '');
         if ($direccionTexto === '') {
-            $this->render(['status' => 'error', 'message' => 'La dirección del servicio es obligatoria'], 400);
-            return;
+            throw new ValidationException(['direccion_texto' => 'La dirección del servicio es obligatoria.']);
         }
 
-        // Deuda menor: direccion_texto no se actualiza en 139b; se hará cuando ServicioService tenga método actualizarDireccion.
-        $this->servicioService->actualizar($id, [
-            'alias' => trim($input['alias'] ?? '') ?: null,
-            'estado_comercial' => trim($input['estado_comercial'] ?? 'pendiente'),
-            'plan_id' => isset($input['id_plan']) && $input['id_plan'] !== '' ? (int) $input['id_plan'] : 1,
-            'nap_id' => isset($input['id_naps']) && $input['id_naps'] !== '' ? (int) $input['id_naps'] : null
-        ]);
+        $dirActual = null;
+        if (!empty($servicioActual['direccion_id'])) {
+            $dirActual = $this->direccionServicioRepo->findById((int) $servicioActual['direccion_id']);
+        }
+
+        $latRaw = array_key_exists('latitud', $input) && $input['latitud'] !== '' ? $input['latitud'] : null;
+        $lonRaw = array_key_exists('longitud', $input) && $input['longitud'] !== '' ? $input['longitud'] : null;
+
+        $lat = null;
+        if ($latRaw !== null) {
+            $latNorm = str_replace(',', '.', (string) $latRaw);
+            if (!is_numeric($latNorm)) {
+                throw new ValidationException(['latitud' => 'La latitud debe ser numérica (usa punto como separador decimal, ej. 10.4806).']);
+            }
+            $lat = (float) $latNorm;
+        } elseif ($dirActual !== null && $dirActual['latitud'] !== null) {
+            $lat = (float) $dirActual['latitud'];
+        }
+
+        $lon = null;
+        if ($lonRaw !== null) {
+            $lonNorm = str_replace(',', '.', (string) $lonRaw);
+            if (!is_numeric($lonNorm)) {
+                throw new ValidationException(['longitud' => 'La longitud debe ser numérica (usa punto como separador decimal, ej. -66.9036).']);
+            }
+            $lon = (float) $lonNorm;
+        } elseif ($dirActual !== null && $dirActual['longitud'] !== null) {
+            $lon = (float) $dirActual['longitud'];
+        }
+
+        $datos = [
+            'estado_comercial' => array_key_exists('estado_comercial', $validated) && $validated['estado_comercial'] !== null && $validated['estado_comercial'] !== ''
+                ? $validated['estado_comercial']
+                : $servicioActual['estado_comercial'],
+            'direccion_texto' => $direccionTexto,
+            'latitud' => $lat,
+            'longitud' => $lon
+        ];
+
+        if (array_key_exists('alias', $input)) {
+            $datos['alias'] = trim($input['alias']) ?: null;
+        }
+
+        if (array_key_exists('plan_id', $validated) && $validated['plan_id'] !== null && $validated['plan_id'] !== '') {
+            $datos['plan_id'] = (int) $validated['plan_id'];
+        }
+
+        if (array_key_exists('nap_id', $validated)) {
+            $datos['nap_id'] = ($validated['nap_id'] !== null && $validated['nap_id'] !== '')
+                ? (int) $validated['nap_id']
+                : null;
+        }
+
+        $this->servicioService->actualizar($id, $datos);
 
         $this->render(['status' => 'success', 'message' => 'Servicio actualizado'], 200);
     }

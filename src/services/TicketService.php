@@ -1,4 +1,5 @@
 <?php
+// services/TicketService.php
 declare(strict_types=1);
 
 namespace App\Services;
@@ -16,6 +17,17 @@ use App\Repositories\TareaRepository;
 
 /**
  * Servicio para la gestión de tickets de soporte.
+ *
+ * A2-B.5 (2026-11-01):
+ *   - crear() acepta $usuarioId nullable. Cuando el ticket lo crea un
+ *     cliente del portal, `usuario_creador_id = NULL`. Esto cumple el
+ *     schema (`tickets.usuario_creador_id int(11) DEFAULT NULL`) y
+ *     refleja el patrón de Splynx/Sonar: el creador de un ticket del
+ *     portal es el cliente, no un staff.
+ *   - crear() valida ownership de `servicio_id` (debe pertenecer al
+ *     cliente del ticket). Cierra BOLA/IDOR lateral: sin esta
+ *     validación, un cliente podría crear un ticket apuntando al
+ *     servicio de otro cliente (FK válida, ownership inválido).
  */
 final class TicketService extends BaseService
 {
@@ -37,6 +49,9 @@ final class TicketService extends BaseService
     /** @var TareaRepository */
     private TareaRepository $tareaRepo;
 
+    /** @var NotificacionService */
+    private NotificacionService $notificacionService;
+
     /**
      * Constructor del servicio.
      *
@@ -51,32 +66,64 @@ final class TicketService extends BaseService
         $this->categoriaRepo = new CategoriaTicketRepository($pdo);
         $this->usuarioRepo = new UsuarioRepository($pdo);
         $this->tareaRepo = new TareaRepository($pdo);
+        $this->notificacionService = new NotificacionService($pdo);
     }
 
     /**
      * Crea un nuevo ticket.
      *
-     * @param array $datos
+     * El creador puede ser un usuario staff ($usuarioId > 0) o el
+     * cliente del portal ($usuarioId = null). En el segundo caso,
+     * `usuario_creador_id` queda NULL en BD y el `cliente_id` es el
+     * autor. Patrón Splynx/Sonar.
+     *
+     * Si `servicio_id` viene, valida que el servicio pertenezca al
+     * cliente del ticket. Cierra BOLA/IDOR lateral.
+     *
+     * Si `origen === 'portal_cliente'`, dispara `eventoTicketCreado`:
+     * notifica al cliente (confirmación) y a todos los admins activos
+     * (excepto al creador, si lo hubiera). En backoffice, no notifica
+     * (el staff es el creador y ya conoce el ticket).
+     *
+     * Transaccional: si la notificación falla, el ticket hace rollback.
+     *
+     * @param array    $datos
+     * @param int|null $usuarioId ID del usuario autenticado (staff) o null
+     *                            si el ticket lo crea un cliente del portal.
      * @return int
      * @throws NotFoundException
      * @throws ValidationException
      */
-    public function crear(array $datos): int
+    public function crear(array $datos, ?int $usuarioId = null): int
     {
+        unset($datos['usuario_creador_id']);
+        $datos['usuario_creador_id'] = ($usuarioId !== null && $usuarioId > 0) ? $usuarioId : null;
+
         if (!isset($datos['cliente_id']) || !$this->clienteRepo->exists((int) $datos['cliente_id'])) {
             throw new NotFoundException('El cliente especificado no existe.');
         }
 
-        if (isset($datos['servicio_id']) && !$this->servicioRepo->exists((int) $datos['servicio_id'])) {
-            throw new NotFoundException('El servicio especificado no existe.');
+        $clienteId = (int) $datos['cliente_id'];
+
+        if (isset($datos['servicio_id']) && $datos['servicio_id'] !== null && $datos['servicio_id'] !== '') {
+            $servicioId = (int) $datos['servicio_id'];
+            if (!$this->servicioRepo->exists($servicioId)) {
+                throw new NotFoundException('El servicio especificado no existe.');
+            }
+            // A2-B.5-5 — ownership de servicio_id: el servicio debe
+            // pertenecer al cliente del ticket. Cierra BOLA/IDOR lateral.
+            $servicio = $this->servicioRepo->findById($servicioId);
+            if ($servicio === null || (int) $servicio['cliente_id'] !== $clienteId) {
+                throw new ValidationException([
+                    'servicio_id' => 'El servicio no pertenece al cliente del ticket.'
+                ]);
+            }
         }
 
-        if (isset($datos['categoria_id']) && !$this->categoriaRepo->exists((int) $datos['categoria_id'])) {
-            throw new NotFoundException('La categoría especificada no existe.');
-        }
-
-        if (isset($datos['usuario_creador_id']) && !$this->usuarioRepo->exists((int) $datos['usuario_creador_id'])) {
-            throw new NotFoundException('El usuario creador especificado no existe.');
+        if (isset($datos['categoria_id']) && $datos['categoria_id'] !== null && $datos['categoria_id'] !== '') {
+            if (!$this->categoriaRepo->exists((int) $datos['categoria_id'])) {
+                throw new NotFoundException('La categoría especificada no existe.');
+            }
         }
 
         $this->validarEnums($datos);
@@ -91,14 +138,31 @@ final class TicketService extends BaseService
 
         unset($datos['sla_vence_en']);
 
-        return $this->ticketRepo->create($datos);
+        $closure = function () use ($datos, $usuarioId) {
+            $ticketId = $this->ticketRepo->create($datos);
+
+            if (($datos['origen'] ?? 'backoffice') === 'portal_cliente') {
+                $this->notificacionService->eventoTicketCreado(
+                    $ticketId,
+                    (int) $datos['cliente_id'],
+                    (string) ($datos['asunto'] ?? ''),
+                    ($usuarioId !== null && $usuarioId > 0) ? $usuarioId : null
+                );
+            }
+
+            return $ticketId;
+        };
+
+        if ($this->pdo->inTransaction()) {
+            return $closure();
+        }
+        return $this->transaction($closure);
     }
 
     /**
      * Actualiza un ticket existente.
      *
      * La transición de estado la valida el trigger trg_tickets_validar_transicion.
-     * Las transiciones válidas están en la tabla transicion_estado (ver migración 137g-3).
      *
      * @param int $id
      * @param array $datos
@@ -159,6 +223,9 @@ final class TicketService extends BaseService
     /**
      * Cierra un ticket, añadiendo un detalle a la descripción.
      *
+     * Notifica al cliente dueño del ticket vía `eventoTicketCerrado`.
+     * Transaccional: si la notificación falla, el cierre hace rollback.
+     *
      * @param int $id
      * @param string $detalle
      * @return void
@@ -182,10 +249,26 @@ final class TicketService extends BaseService
                 : "Cierre: " . trim($detalle);
         }
 
-        $this->ticketRepo->update($id, [
-            'estado' => 'Cerrado',
-            'descripcion' => $nuevaDescripcion
-        ]);
+        $closure = function () use ($id, $nuevaDescripcion, $ticket) {
+            $this->ticketRepo->update($id, [
+                'estado' => 'Cerrado',
+                'descripcion' => $nuevaDescripcion
+            ]);
+
+            if (!empty($ticket['cliente_id'])) {
+                $this->notificacionService->eventoTicketCerrado(
+                    $id,
+                    (int) $ticket['cliente_id'],
+                    (string) ($ticket['asunto'] ?? '')
+                );
+            }
+        };
+
+        if ($this->pdo->inTransaction()) {
+            $closure();
+            return;
+        }
+        $this->transaction($closure);
     }
 
     /**
@@ -243,7 +326,7 @@ final class TicketService extends BaseService
     }
 
     /**
-     * Método privado. Valida los ENUM de tickets. No se llama desde fuera del service.
+     * Método privado. Valida los ENUM de tickets.
      *
      * @param array $datos
      * @return void

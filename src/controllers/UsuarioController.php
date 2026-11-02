@@ -11,6 +11,11 @@ use App\Exceptions\ValidationException;
 
 /**
  * Controlador para la gestión de usuarios.
+ *
+ * Fase 4.2-hotfix1: el PUT de edición (usuarios_editar.php) YA NO toca
+ * roles. Los roles se cambian solo vía PUT usuarios_roles.php
+ * (UsuarioController::saveRoles). Es el patrón de Salesforce / Azure AD:
+ * "Edit User" (identidad) y "Edit Roles" (permisos) son acciones separadas.
  */
 final class UsuarioController extends BaseController
 {
@@ -86,11 +91,50 @@ final class UsuarioController extends BaseController
     }
 
     /**
-     * Actualiza un usuario existente.
+     * Actualiza un usuario existente (SOLO identidad: username + email).
+     *
+     * Fase 4.2-hotfix1: YA NO procesa roles, aunque el body los traiga.
+     * Los roles se cambian exclusivamente vía saveRoles (PUT usuarios_roles.php).
+     * Si un cliente viejo manda roles en el PUT, se ignoran silenciosamente.
      *
      * @return void
      */
     public function update(): void
+    {
+        $input = $this->input();
+        $id = (int) ($input['id_usuario'] ?? 0);
+
+        if ($id <= 0) {
+            $this->render(['status' => 'error', 'message' => 'Usuario inválido'], 400);
+            return;
+        }
+
+        try {
+            $this->usuarioService->actualizar($id, [
+                'username' => trim($input['username'] ?? ''),
+                'email' => trim($input['email'] ?? '')
+                // roles NO se pasa: viven en saveRoles
+            ]);
+
+            $this->render(['status' => 'success', 'message' => 'Usuario actualizado correctamente.'], 200);
+        } catch (DomainException $e) {
+            $this->render(['status' => 'error', 'message' => $e->getMessage()], 422);
+        } catch (ConflictException $e) {
+            $this->render(['status' => 'error', 'message' => $e->getMessage()], 409);
+        }
+    }
+
+    /**
+     * Actualiza SOLO los roles de un usuario.
+     *
+     * Ruta dedicada (PUT usuarios_roles.php). Reemplaza la asignación
+     * completa. Protege al último administrador activo: si el usuario
+     * tenía el rol 1 (Administrador) y se le intenta quitar siendo el
+     * último admin activo, lanza DomainException → 422.
+     *
+     * @return void
+     */
+    public function saveRoles(): void
     {
         $input = $this->input();
         $id = (int) ($input['id_usuario'] ?? 0);
@@ -105,19 +149,23 @@ final class UsuarioController extends BaseController
             : (isset($input['id_rol']) && $input['id_rol'] !== '' ? [$input['id_rol']] : []);
         $roles = array_values(array_unique(array_filter(array_map('intval', $rolesRaw), fn($r) => $r > 0)));
 
-        try {
-            $this->usuarioService->actualizar($id, [
-                'username' => trim($input['username'] ?? ''),
-                'email' => trim($input['email'] ?? ''),
-                'roles' => $roles
-            ]);
-
-            $this->render(['status' => 'success', 'message' => 'Usuario actualizado correctamente.'], 200);
-        } catch (DomainException $e) {
-            $this->render(['status' => 'error', 'message' => $e->getMessage()], 422);
-        } catch (ConflictException $e) {
-            $this->render(['status' => 'error', 'message' => $e->getMessage()], 409);
+        if (empty($roles)) {
+            $this->render(['status' => 'error', 'message' => 'Debes asignar al menos un rol.'], 400);
+            return;
         }
+
+        // Protección del último admin activo.
+        $rolesActuales = $this->usuarioService->listarRoles($id);
+        $idsActuales = array_column($rolesActuales, 'id');
+        $eraAdmin = in_array(1, $idsActuales, true);
+        $seraAdmin = in_array(1, $roles, true);
+
+        if ($eraAdmin && !$seraAdmin && $this->usuarioService->contarOtrosAdminsActivos($id) === 0) {
+            throw new DomainException('No puedes quitarle el rol de Administrador: es el único administrador activo del sistema.');
+        }
+
+        $this->usuarioService->asignarRoles($id, $roles);
+        $this->render(['status' => 'success', 'message' => 'Roles actualizados correctamente.'], 200);
     }
 
     /**

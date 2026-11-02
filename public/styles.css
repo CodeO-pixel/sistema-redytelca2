@@ -14,20 +14,24 @@
 }
 * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
 body { margin: 0; background: var(--bg); display: flex; }
+@media (min-width: 769px) {
+  body { zoom: 1.1; }
+}
 .sidebar {
 width: 260px;
 background: linear-gradient(180deg, var(--primary), #111827);
-height: 100vh;
+position: fixed;
+top: 0;
+bottom: 0;
 color: white;
 padding: 18px 12px;
-position: fixed;
 overflow-y: auto;
-scrollbar-width: none; /* Firefox: oculta la barra pero permite scroll */
+scrollbar-width: none;
 transition: transform 0.2s ease;
 z-index: 80;
 }
 .sidebar::-webkit-scrollbar {
-display: none; /* Chrome/Safari/Edge: oculta la barra pero permite scroll */
+display: none;
 }
 .sidebar.collapsed {
 transform: translateX(-100%);
@@ -47,11 +51,11 @@ margin-bottom: 18px;
 display: flex;
 align-items: center;
 justify-content: center;
-width: 48px;
-height: 48px;
-padding: 6px;
-border-radius: 14px;
-background: rgba(255,255,255,0.12);
+width: 100%;
+max-width: 200px;
+height: 60px;
+padding: 0;
+background: transparent;
 flex-shrink: 0;
 }
 .brand-logo {
@@ -62,24 +66,27 @@ object-fit: contain;
 .login-brand {
 width: 100%;
 display: flex;
+flex-direction: column;
 justify-content: center;
 align-items: center;
-padding: 12px 0 18px;
-margin-bottom: 12px;
+gap: 12px;
+padding: 8px 0 16px;
+margin-bottom: 8px;
+}
+.login-brand #login-brand-name {
+font-size: 1.05rem;
+font-weight: 700;
+letter-spacing: 0.1em;
+color: var(--primary);
 }
 .login-brand-logo {
 width: auto;
-max-width: 240px;
+max-width: 320px;
 height: auto;
-min-height: 64px;
-max-height: 88px;
+min-height: 80px;
+max-height: 120px;
 object-fit: contain;
 display: block;
-background: rgba(255, 255, 255, 0.12);
-padding: 16px 20px;
-border-radius: 22px;
-border: 1px solid rgba(255, 255, 255, 0.22);
-box-shadow: 0 18px 32px rgba(15, 23, 42, 0.14);
 }
 .payment-logo {
 width: auto;
@@ -287,7 +294,7 @@ transition: transform 0.2s ease;
 transform: rotate(90deg);
 }
 .bottom-group { margin-top: 18px; }
-.main-content { margin-left: 260px; padding: 24px; width: calc(100% - 260px); transition: margin-left 0.2s ease, width 0.2s ease; }
+.main-content { margin-left: 260px; padding: 24px; width: calc(100% - 260px); transition: margin-left 0.2s ease, width 0.2s ease; overflow-x: hidden; }
 .main-content.expanded { margin-left: 0; width: 100%; }
 .top-bar {
 display: flex;
@@ -477,6 +484,7 @@ min-height: 180px;
 .card.chart-card canvas {
 width: 100% !important;
 height: 220px !important;
+display: block;
 }
 .card-title-row {
 display: flex;
@@ -484,8 +492,10 @@ justify-content: space-between;
 align-items: center;
 gap: 8px;
 margin-bottom: 14px;
+flex-wrap: wrap;
+min-width: 0;
 }
-.card-title-row h3 { margin: 0; font-size: 1rem; }
+.card-title-row h3 { margin: 0; font-size: 1rem; min-width: 0; overflow-wrap: break-word; word-break: break-word; }
 .card-title-row span { color: var(--muted); font-size: 0.9rem; }
 .donut-panel { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .donut-chart {
@@ -748,6 +758,7 @@ overflow: hidden;
 border-radius: 18px;
 border: 1px solid var(--border);
 background: #dbeafe;
+z-index: 1;
 }
 /* El mapa profesional (Leaflet) se monta dentro de #map-embed en la
 migración al mapa real. */
@@ -843,7 +854,7 @@ overflow: hidden;
 .donut-chart::after { width: 110px; height: 110px; }
 }
 /* ====================================================================
-FASE 7: COMPONENTES DE UI MODERNOS (Avatar, Toggles y Matriz)
+FASE 7: COMPONENTES DE UI MODERNOS (Avatar y Toggles)
 ==================================================================== */
 /* 1. Avatar del Perfil */
 .profile-avatar {
@@ -907,39 +918,341 @@ transform: translateX(20px);
 opacity: 0.5;
 cursor: not-allowed;
 }
-/* 3. Matriz de Permisos (Grid) */
-.permissions-matrix {
-display: grid;
-grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-gap: 16px;
-margin-top: 16px;
+/* ====================================================================
+BUG-TOPBAR-MOBILE + BUG-BODY-ZOOM-MOBILE (Patrón A: drawer full-height)
+====================================================================
+- body zoom: 1.1 solo en desktop (arriba, @media min-width 769px).
+  Resuelve el bug del zoom flash en Dashboard mobile.
+- Top-bar sticky en mobile (hamburger no se va al scrollear).
+- Sidebar full-height por encima del top-bar (z-index 90 vs 85).
+- Scrim oscuro detrás del sidebar abierto (cierra al tocar).
+==================================================================== */
+@media (max-width: 768px) {
+  .top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 85;
+    background: var(--bg);
+    margin: -16px -16px 18px -16px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  }
+  .sidebar {
+    z-index: 90;
+  }
 }
-.permission-module-card {
-background: #f8fafc;
-border: 1px solid var(--border);
-border-radius: 12px;
-padding: 16px;
+.sidebar-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 88;
+  transition: opacity 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
 }
-.permission-module-title {
-font-weight: 700;
-color: var(--primary);
-font-size: 1.05rem;
-margin: 0 0 12px 0;
-padding-bottom: 8px;
-border-bottom: 1px solid var(--border);
+@media (max-width: 768px) {
+  .sidebar:not(.collapsed) ~ .sidebar-scrim {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
-.permission-item {
-display: flex;
-justify-content: space-between;
-align-items: center;
-padding: 8px 0;
-border-bottom: 1px dashed var(--border);
+/* Botón "Ver en mapa" en modales con coordenadas (B3.13). */
+.btn-map {
+  width: auto;
+  padding: 10px 14px;
+  background: #0ea5e9;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
 }
-.permission-item:last-child {
-border-bottom: none;
-padding-bottom: 0;
+.btn-map:hover { background: #0284c7; }
+/* ====================================================================
+FASE 4.3 — Matriz de permisos en tabla (no cards).
+Patrón Salesforce Profiles / Splynx Roles / SAP Authorization / Odoo.
+Filas = páginas agrupadas por módulo. Columnas = Ver/Leer/Crear/Editar/
+Eliminar/Validar. Celda "—" = permiso no aplicable a esa página.
+==================================================================== */
+.permissions-matrix-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #ffffff;
 }
-.permission-label {
-font-size: 0.95rem;
-color: var(--text);
+.permissions-matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 0.9rem;
+}
+
+/* Header row */
+.permissions-matrix-table thead th {
+  background: #f1f5f9;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 14px 12px;
+  border-bottom: 2px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+}
+.permissions-matrix-table thead th:first-child {
+  text-align: left;
+  padding-left: 20px;
+  width: 40%;
+}
+
+/* Data cells */
+.permissions-matrix-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+}
+.permissions-matrix-table td:first-child {
+  text-align: left;
+  padding-left: 20px;
+  font-weight: 500;
+}
+
+/* Module header row (acento a la izquierda) */
+.permissions-matrix-table .permiso-module-row td {
+  background: #eef2f7;
+  font-weight: 700;
+  text-align: left;
+  padding: 14px 20px;
+  font-size: 0.8rem;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-top: 2px solid var(--border);
+  border-left: 4px solid var(--accent);
+}
+.permissions-matrix-table tbody tr.permiso-module-row:hover td {
+  background: #eef2f7;
+}
+
+/* Warning row (Config para no-Admin) */
+.permissions-matrix-table .permiso-module-warning td {
+  background: #fef3c7;
+  color: #92400e;
+  text-align: left;
+  padding: 8px 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-style: italic;
+  border-left: 4px solid #f59e0b;
+}
+.permissions-matrix-table tbody tr.permiso-module-warning:hover td {
+  background: #fef3c7;
+}
+
+/* Checkbox cell */
+.permissions-matrix-table .permiso-cell {
+  width: 72px;
+  text-align: center;
+}
+.permissions-matrix-table .permiso-cell label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.permissions-matrix-table .permiso-cell label:hover {
+  background: rgba(var(--accent-rgb), 0.08);
+}
+.permissions-matrix-table .permiso-cell input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.permissions-matrix-table .permiso-cell input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Non-applicable cell */
+.permissions-matrix-table .permiso-cell-na {
+  color: #cbd5e1;
+  text-align: center;
+  font-size: 1rem;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* Hover en filas de datos (solo tr[data-pagina-block], no module headers) */
+.permissions-matrix-table tbody tr[data-pagina-block]:hover td {
+  background: rgba(var(--accent-rgb), 0.04);
+}
+.permissions-matrix-table tbody tr[data-pagina-block]:hover td:first-child {
+  background: rgba(var(--accent-rgb), 0.06);
+}
+
+/* .permiso-pagina se mantiene (el HTML lo usa en el <td> de la página) */
+.permissions-matrix-table .permiso-pagina {
+  text-align: left;
+  font-weight: 500;
+}
+/* ... (todo el styles.css actual se mantiene sin cambios, hasta `.permissions-matrix-table .permiso-pagina { text-align: left; font-weight: 500; }`). */
+
+/* ====================================================================
+   086c — Campana de notificaciones + dropdown + página notificaciones.
+   Patrón Gmail / Slack / GitHub / Salesforce Lightning.
+   ==================================================================== */
+.notif-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.notif-bell {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: white;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  font-size: 1.1rem;
+  font-family: inherit;
+}
+.notif-bell:hover { background: #f8fafc; }
+.notif-bell-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--danger);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  line-height: 1;
+}
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 360px;
+  max-height: 480px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+  z-index: 200;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.notif-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.notif-dropdown-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 360px;
+}
+.notif-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.notif-item {
+  display: flex;
+  width: 100%;
+  padding: 10px 16px;
+  background: white;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  cursor: pointer;
+  gap: 10px;
+  font-family: inherit;
+}
+.notif-item:hover { background: #f8fafc; }
+.notif-unread { background: #eff6ff; }
+.notif-unread:hover { background: #dbeafe; }
+.notif-item-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+.notif-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.notif-item-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notif-item-msg {
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+}
+.notif-item-date {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+.notif-dropdown-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.notif-link {
+  width: auto;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--accent);
+  border: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-family: inherit;
+}
+.notif-link:hover { text-decoration: underline; }
+@media (max-width: 768px) {
+  .notif-dropdown {
+    width: calc(100vw - 32px);
+    right: -8px;
+  }
 }

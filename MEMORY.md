@@ -1,430 +1,292 @@
 # MEMORY.md — REDYTELCA
 
-Estado operativo entre sesiones. **Único documento de estado del proyecto.**
+Estado operativo entre sesiones. **RAM del proyecto, no disco.** Solo lo que un agente necesita al inicio de sesión: dónde estamos, qué sigue, qué deudas bloquean, qué reglas aplicar ahora, dónde buscar el resto.
 
-- Qué spec existe y en qué estado → `docs/ROADMAP.md`.
+- Specs y su estado → `docs/ROADMAP.md`.
+- Detalle histórico de Fase 1 → `docs/HISTORICO_FASE1.md` (⚠️ parcial: B2 recuperado 2026-10-31; B3.0–B3.13 perdido).
+- Detalle de A2-B.1/3/4/5 (backend) → `docs/ROADMAP.md` §Histórico + `docs/ARQUITECTURA.md` §Notificaciones + §Portal de cliente.
 - Hallazgos canónicos → `docs/AUDITORIA_2026.md`.
+- Esquema de BD → `bd_redytelca.sql` + `bd_redytelca_schema.sql` + `docs/BD.md`.
 - Cómo está construido → `docs/ARQUITECTURA.md`.
-- Esquema → `bd_redytelca.sql`.
-- Estándares, frases de defensa, industria descartada → `docs/REFERENCIA.md`.
-- Reglas del ecosistema documental → `docs/GOBERNANZA.md`.
+- Estándares, citas de industria, frases de defensa → `docs/REFERENCIA.md`.
+- Lecciones de verificación → `docs/VERIFICACION.md`.
+- Reglas del repo → `AGENTS.md`.
+- Reglas del proceso → `docs/METODOLOGIA_DESARROLLO_IA.md`.
 
 ---
 
 ## Estado actual
 
-- **Fase 1 — MVC CERRADA** (excepto 140).
-  - Cerradas: 134, 135, 136, 137, 138, 139a, 139b, 139c, **139d**, **139e**.
-  - En progreso: ninguna.
-  - Pendientes: **140** (frontend modular).
-- **BD cerrada (2026-10-16).** 44 tablas. Convención `PK=id` / `FK=tabla_id`. `logs`→`auditoria_logs`. 145 triggers, 4 vistas, 41 CHECKs. Vive en el histórico del ROADMAP.
-- **0 endpoints caídos.** Los 13 endpoints de la Fase 1 quedaron reactivados: 5 de roles/permisos en Tanda C, 2 de empresa en Tanda D, y los 6 de infra/soporte en 139c. `conexion.php` **eliminado** en Tanda E.
-- **`app.js` e `index.html` son de 140** (frontend viejo, no tocado en 139). Frontend viejo manda `id_*` (pre-B28), backend nuevo espera `*_id` (post-ADR 016) — frontend viejo no puede crear ni editar. Deuda 139b-3.
-- **2 bugs corregidos en runtime durante verificación de 139b:** BUG-6.3 (`PagoController::update` pasaba `id_pago`) y BUG-6.4 (`FacturaController::update` pasaba `id_factura`). Ambos resueltos.
-- **BUG-6.2 resuelto (2026-10-18, Tanda B):** `Auth::requireStaffAuth` con tercer parámetro `$bypassMustChangePassword` + `cambiar_password.php` con bypass=true. Verif. 6/6 + no-daño verde.
+**Fase activa: Fase 2 — F2.0a + 38 specs F2.1–F2.38.**
 
-## Fase activa
+### Cerradas
 
-**FASE 1 — MVC.**
+- Fase 1 (MVC) — 2026-10-30. 22 módulos MVC. `app.js` eliminado.
+- Cierre documental F2.0b — 2026-10-31.
+- Fase 4 (Roles + permisos en grilla) — 2026-10-31. 6 sub-fases (4.0–4.4).
+- Tanda de fixes 2026-10-31 — scroll + polish matriz.
+- A2-B.1 (notificaciones backend) — 2026-10-31.
+- A2-B.3 (portal auth backend) — 2026-10-31.
+- A2-B.4 (portal facturas/pagos/servicios backend) — 2026-11-01.
+- A2-B.5 (portal tickets/respuestas backend) — 2026-11-01.
+- 086c (campana staff + página `notificaciones`) — 2026-11-01.
+- 096a (portal auth UI) — 2026-11-01. `portal_cliente.php` reescrito como SPA. `portal.css`, `js/portal/core/{Session,Router}.js` (forks con clave `redytelca_portal_session` y `SECTION_MAP` propio), `js/portal/controllers/AuthController.js`, `js/portal/views/AuthView.js`, `js/portal/main.js`. `ApiClient.js` modificado para elegir sesión según `window.__appContext` (`'portal'` vs default admin). Bug encontrado y corregido: `ApiClient` usaba siempre `window.Session` → 401 "No autenticado" en cambio de contraseña.
+- 096e (portal servicios UI, read-only) — 2026-11-01. Página `portal-servicios` con tabla, búsqueda, paginación client-side, modal de detalle (red NAP·OLT·Nodo, equipo, coordenadas, fechas UTC→local). BOLA/IDOR cerrado (segundo cliente no ve los servicios del primero, verificado 3.6).
+- 096b (portal facturas UI, read-only, `formatDual`) — 2026-11-01. Página `portal-facturas` con tabla, filtros server-side (estado, periodo), paginación server-side, modal de detalle con líneas de factura + totales (`total`, `pagado`, `saldo`) todos con `formatDual`. Fix durante verificación: el backend del portal NO devuelve `nombres`/`apellidos`/`cedula` (decisión A2-B.4: el cliente ya se conoce a sí mismo, no se repite PII). El `FacturaView.renderDetailModal` lee estos datos de `PortalSession.get().cliente` con fallback a `factura.nombres` por si el backend los incluye en el futuro. Verificado 2.1–2.10.
+- 096c (portal pagos UI, list + create + upload) — 2026-11-01. Página `portal-pagos` con toolbar (filtro `estado` + botón "Registrar pago"), tabla con `formatDual`, paginación server-side. Modal "Registrar pago" con: select servicio (desde `PortalServicioModel.cache`), select factura filtrado por servicio (excluye pagadas/anuladas, opción "pago a cuenta"), monto USD, moneda (USD/VES), tasa BCV condicional (visible solo si VES), fecha (datetime-local → `Y-m-d H:i:s` al backend), método de pago, referencia bancaria condicional (si `metodo.requiere_referencia`), upload de comprobante (JPG/PNG/WEBP/PDF, máx 2 MB, SVG rechazado) con preview para imágenes. Modal de detalle con datos del cliente (leídos de `PortalSession.get().cliente` por A2-B.4) + descarga de comprobante vía `fetch` + blob (el endpoint requiere `X-Session-Token`, no se puede abrir como URL estática). "Pago a cuenta" confirmado con `Modal.confirm` antes de enviar. Archivos: `js/portal/models/MetodoPagoModel.js`, `js/portal/models/PagoModel.js`, `js/portal/views/PagoView.js`, `js/portal/controllers/PagoController.js`, `js/portal/main.js` (Router.register). Verificado 3.1–3.20.
+- 096d (portal tickets UI, list + create + detail + reply) — 2026-11-02. Página `portal-tickets` con tabla (Asunto, Categoría con swatch, Prioridad, Estado, Creado, SLA vence, Acciones), filtros server-side (`estado`, `prioridad`), paginación server-side. Modal de detalle con hilo de respuestas (`autor_label` resuelto por el backend vía JOIN, timestamps UTC→local) + textarea de respuesta inline. Modal de "Nuevo ticket" con selects de categoría (desde `PortalTicketModel.categoriasCache`) y servicio (desde `PortalServicioModel.cache`). **Ticket `Cerrado` es terminal para el cliente** (Zendesk: *"Closed is forever. There's no reopening a Closed ticket"*): textarea + botón "Enviar respuesta" deshabilitados, mensaje "Crea un ticket nuevo". Backend pre-req creado en la misma spec: `api_portal_categorias_ticket.php` (thin con `requireClientAuth` sin bypass, GET solo, 401 sin token, 405 en POST) + `CategoriaTicketService::listarActivas()` + `CategoriaTicketController::indexPortal()`. **Búsqueda por texto NO implementada** (la paginación es server-side; un filtro client-side solo vería la página actual y confundiría al usuario). Deuda `PORTAL-TICKET-BUSQUEDA-AVANZADA` ampliada a Fase 2. Archivos nuevos: `js/portal/models/TicketModel.js`, `js/portal/views/TicketView.js`, `js/portal/controllers/TicketController.js`. Modificados: `portal_cliente.php` (página + 2 modales + scripts), `js/portal/main.js` (`Router.register('portal-tickets')` + `__portalCaches()` con tickets y categorías). Verificado browser: filtros, crear, ver detalle, responder, ticket cerrado deshabilitado, BOLA/IDOR cerrado (cliente B no ve tickets de A), `must_change_password` bloqueante.
+- 096f (portal PDF de factura, browser print) — 2026-11-02. `FacturaPdfView.js` (nuevo) genera un popup con HTML print-friendly (`@media print` embebido, A4, márgenes 18mm, logo de empresa, datos de cliente/factura, tabla de líneas, totales, footer) y dispara `window.print()` tras 250ms. `FacturaView.renderDetailModal` añade botón "Imprimir / PDF" con listener inline (el modal se re-genera en cada apertura). **Sin librerías externas** (constitución §1): el usuario elige "Guardar como PDF" en el diálogo nativo del navegador. **El PDF es informativo, no fiscal.** SENIAT exige número de control, RIF del emisor y del receptor, y datos fiscales que el esquema actual no tiene. Footer lleva aviso explícito: *"Documento informativo. No constituye factura fiscal."* Deuda `FACTURA-FISCAL-SENIAT` a Fase 7. Patrón Splynx (facturas no fiscales vía browser print). `formatDual` reusado de `FacturaView` (misma lógica en tabla, detalle y PDF). Verificado browser: login → Facturas → detalle → "Imprimir / PDF" → diálogo de impresión → "Guardar como PDF".
+- **086d (notif cliente en portal) — 2026-11-02.** Campana de notificaciones del cliente en `portal_cliente.php` (topbar + badge + dropdown + modal de detalle), `portal.css` con la sección `portal-notif-*` (30 clases: `portal-notif-bell`, `portal-notif-bell-badge`, `portal-notif-dropdown`, `portal-notif-item`, `portal-notif-unread`, `portal-notif-empty`, `portal-notif-link`, etc.; badge rojo `var(--danger)`, item no leído con fondo `#eff6ff`, dropdown responsivo a ancho completo en móvil). Archivos nuevos: `js/portal/models/NotificacionModel.js`, `js/portal/views/NotificacionView.js`, `js/portal/controllers/NotificacionController.js`. `main.js` registra el hook `window.__onPortalLoginSuccess = () => PortalNotificacionController.startPolling()` y lo invoca post-login/restore; `PortalAuthController._clearSession()` detiene el polling y limpia el modelo en logout/restore fallido. `PortalNotificacionController.startPolling()` hace un `_pollOnce()` inicial (badge visible en ≤2s, no 30s) y luego `setInterval(30s)`. `markRead(id, url)` decrementa el badge y navega a `url_destino` (`/portal/tickets?id=N`, `/portal/pagos?id=N`, `/portal/facturas?id=N`) vía `PortalRouter.showPage` + `showDetail`. **086d-fix (2026-11-02):** `PortalNotificacionController.init()` invocado en `DOMContentLoaded`. Sin esto, el listener del click en la campana nunca se ataba y el dropdown no abría (el badge sí aparecía porque el polling lo arranca `main.js`). Verificado en browser: campana, badge, dropdown, mark all read, click en item → navega + detalle. Con `Ctrl+Shift+R` y DevTools → Network abierta.
 
-MVC completo sin framework. Namespaces PSR-4, DI por constructor, repositorios, servicios, controladores, validadores, excepciones de dominio. Page Controller. Vista JSON para admin, HTML para portal (Fase 5). ADR 017.
+### En progreso
 
-| Spec | Nombre | Estado |
-|---|---|---|
-| 134 | `core/` (kernel MVC) | ✅ cerrada |
-| 135 | `models/` (35 entidades) | ✅ cerrada |
-| 136 | `repositories/` (35 repos) | ✅ cerrada |
-| 137 | `services/` (18 servicios) | ✅ cerrada |
-| 138 | `validators/` (16 validadores) | ✅ cerrada |
-| 139a | Auth, Perfil, Usuario, Cliente + 14 thin endpoints | ✅ cerrada (12/12 curl+SQL) |
-| 139b | Servicio, Contrato, Plan, Factura, Pago, MetodoPago + 8 thin endpoints | ✅ cerrada (26/26 curl+SQL, 2 bugs fixed) |
-| 139c | Nodo, Olt, Nap, Equipo, Ticket, Tarea, Pedido + 7 thin endpoints (1 nuevo) + migración pedidos-rbac | ✅ cerrada (39/39 curl+SQL, migración verificada) |
-| 139d | Rol, Permiso, Empresa + 7 thin + `branding.css.php` reescrito + migrar `tests/audit_context.test.php` + borrar `conexion.php`. **5 tandas, 59/59 verde.** Cierra Fase 1 MVC. | ✅ cerrada |
-| 139e | Estructura de despliegue: mover `core/`, `controllers/`, `services/`, `repositories/`, `models/`, `validators/`, `tests/` a `src/`; mover thin files + `index.html` + `app.js` + `styles.css` + `Logos/` + `uploads/` a `public/`; actualizar `require` y `Bootstrap.php`; `.htaccess` fallback. Cierra la exposición del código fuente al webroot. ADR 018 al cerrar Tanda E. | ✅ cerrada |
-| 140 | frontend modular (`js/`) + borrar `app.js` | ⏳ pendiente |
+- **Ninguna.** Última cerrada: 086d (notif cliente en portal). Próxima: F2.0a.
 
-**Orden:** 134 → 135 → 136 → 137 → 138 → 139a → 139b → 139c → 139d → **139e** → 140.
+### Próximos pasos
 
-**Cierre de 139a:** 12/12 verde en curl+SQL. BUG-6.2 documentado (dead-end `must_change_password`, se resuelve en 139d).
+1. **F2.0a** — auditoría de usabilidad pre-Fase 2. Documento `docs/AUDITORIA_USABILIDAD_B3.md` (nuevo). Incluye `BUG-ENTER-TAREA-TICKET`, `UX-PERFIL-ESTADO-SESION`, `UX-PERFIL-LIMIT-AMBIGUO`, `UX-PAGO-RECHAZAR`, `UX-PERM-BOTONES`.
+2. **Fase 2** — 38 specs de dominio (F2.1–F2.38) + deudas heredadas de MVC y Fase 5.
+3. **A2-B.2, A2-B.6, A2-B.7** (backend Fase 7) antes de Fase 7.
 
-**Cierre de 139b:** 26/26 verde en curl+SQL. 2 bugs encontrados y corregidos en runtime:
-- BUG-6.3: `PagoController::update` pasaba `id_pago` al service → 500. Fix: `unset($input['id_pago'])`.
-- BUG-6.4: `FacturaController::update` pasaba `id_factura` al service → 500. Fix: `unset($input['id_factura'])`.
+### Conteos
 
-Deudas documentadas: 139b-1 (4 endpoints sin JOINs), 139b-2 (Servicio update sin direccion), 139b-3 (frontend viejo manda `id_*`, backend nuevo espera `*_id`). Las 3 se resuelven en 140.
+- Cerradas: **154** specs (134 hasta Fase 1 + 20 post-Fase-1: F2.0b, Fase 4 ×6, tanda 2026-10-31, A2-B.1/3/4/5, 086c, 096a, 096e, 096b, 096c, 096d, 096f, 086d).
+- En progreso: **0**.
+- Pendientes: Fase 2 (38 specs F2.1–F2.38 + deudas heredadas), A2-B.2/A2-B.6/A2-B.7 (3), Fase 7 (~30 specs), Fase 3 (6 specs).
+- Bugs abiertos Fase 1: **0**.
+- Bugs abiertos Fase 4: **0**.
+- Bugs abiertos Fase 5: **0** (8/8 specs cerradas: 086c, 096a, 096e, 096b, 096c, 096d, 096f, 086d).
+- Bugs abiertos Fase 2 (dominio): **38** (F2.1–F2.38).
 
-**Cierre de 139c:** 39/39 verde en curl+SQL (19 Tanda A + 20 Tanda B). 0 bugs runtime. Migración `2026-10-18-139c-pedidos-rbac.sql` aplicada: página `pedidos` (id=23, modulo_id=3), Admin 4 permisos (leer, crear, editar, eliminar), Operador 3 permisos (leer, crear, editar). Verificada con triggers de auditoría (1 INSERT paginas, 2 rol_modulo_pagina, 7 rol_modulo_permiso).
+### A2-B
 
-Deudas documentadas: 139c-1 (7 index sin JOINs), 139c-2 (sidebar pedidos sin showPage), 139c-3 (EquipoController::index sin filtro devuelve solo stock), 139c-4 (Operador sin `leer` en tickets/tareas), 139c-5 (PedidoService::asignarTecnico no expuesto). 139c-1, 139c-2, 139c-3, 139c-5 se resuelven en 140. 139c-4 se resuelve en spec RBAC de Fase 2.
+A2-B.1 ✅, A2-B.3 ✅, A2-B.4 ✅, A2-B.5 ✅. **Pendientes: A2-B.2, A2-B.6, A2-B.7** (Fase 7).
 
-**Cierre de 139d Tanda B (2026-10-18):** BUG-6.2 cerrado. `Auth::requireStaffAuth` con tercer parámetro `$bypassMustChangePassword` (default `false`). `cambiar_password.php` es el ÚNICO thin que pasa `true`. Verif. `tests/verify_139d_b.php` 6/6 + no-daño verde.
+### 22 módulos frontend admin MVC + notificaciones + portal
 
-**Cierre de 139d Tanda C (2026-10-18):** 5 endpoints reactivados como thin (`roles_listar`, `roles_editar`, `roles_eliminar`, `permisos_listar`, `permisos_guardar`). 2 controllers nuevos (`RolController`, `PermisoController`). 2 métodos nuevos en repos de pivots (`RolModuloPaginaRepository::findByRolId`, `RolModuloPermisoRepository::findByRolId`). 1 método nuevo en `PermisoService` (`listarMatriz`). Cierra G1 (roles sin semilla) y 136f-bis para `rol_modulo*`. Verif. `tests/verify_139d_c.php` 22/22 + no-daño verde (`usuarios=4`, `rol_modulo=13`, `rmpag=39`, `rmperm=137`). 0 bugs runtime. AI Studio intentó reescribir 3 archivos con regresión (borró `findModulosPermitidosByRoles`, revirtió `guardarMatriz` a SQL inline, cambió `insertIgnore` a array); rechazados, aplicados los 3 correctos del dump + Tanda A.
+**Admin:** Clientes, Planes, Nodos, OLTs, NAPs, Servicios, Equipos, Roles, Permisos, Usuarios, Facturas, Pagos, Contratos, Tickets, Auditoría, Tareas, Pedidos, Empresa, Perfil, Mapa, Dashboard, Reportes + **Notificaciones (086c)**.
 
-**Cierre de 139d Tanda D (2026-10-18):** `EmpresaController` (nuevo) + `api_empresa.php` + `api_empresa_publica.php` + `branding.css.php` reescritos. E2E D1–D8 verde: GET Admin 200 con config completo, GET Operador 403 (SoD), POST sin logo 200 + persistencia en BD, POST con PNG 200 + `logo_path=uploads/empresa/logo.png` + archivo en disco, POST con .txt 422 (`errors.logo`), API pública 200 con 3 campos (B09 cerrado), branding.css 200 con `Content-Type: text/css` + `:root`, corrupción de color → fallback `#104aa8`. Restore R1–R5: `configuracion_empresa` = `REDYTELCA | Logos/logo_transparent.png | #104aa8`, RBAC seed intacto (`rol=2, rol_modulo=13, rmpag=39, rmperm=137`). Deuda 139d-2 implementada (`@unlink` en catch).
-
-**Cierre de 139d Tanda E (2026-10-18):** `tests/audit_context.test.php` migrado de `conexion.php` a `core/Auth.php` (usa `Bootstrap::init()` local + `Auth::setAuditContext` + `use ($pdo)` en closures). `conexion.php` eliminado tras verificar 0 refs ejecutables (4× `findstr` de patrones `require __DIR__...`, `require_once __DIR__...`, `require '...'`, `require_once '...'` → 0 líneas). `dir conexion.php` → File Not Found. 5× `php -l` (EmpresaController, api_empresa, api_empresa_publica, branding.css, test migrado) → sin errores. Harness final `php tests/run.php` → 9/9.
-
-**Nota crítica:** el código ya no tiene endpoints caídos. `app.js` e `index.html` son de 140 (frontend modular). Las 3 deudas de contrato (139b-1, 139b-3, 139c-1) se resuelven en 140. `conexion.php` ya no existe.
-
-**Reglas nuevas heredadas de 139b:**
-- Verificar `unset($input['id_X'])` en cada `update()` de cada controlador (causa de BUG-6.3 y BUG-6.4).
-- Tests de DELETE solo con dummies creados en el turno, nunca con seed.
-- Verificar cada endpoint contra el esquema post-B28 antes de fusionar.
-
-**Reglas nuevas heredadas de 139c:**
-- Aplicar migración SQL primero (pedidos-rbac), verificar con triggers antes de escribir controllers.
-- Los dummies de verificación se borran en el mismo turno; no tocar el seed.
-- Los 5 deletes bloqueados por dependencias se testean contra el seed (nodo 1, OLT 1, NAP 1, ticket 10) sin borrarlos.
-- Verificar trigger 1644 con transición inválida (`Cerrado→Abierto`) y transición válida (`Cerrado→En proceso`).
-
-**Reglas nuevas heredadas de 139d Tanda C:**
-- Cuando AI Studio entrega un archivo "modificado", verificar que NO perdió métodos existentes. En Tanda C, AI Studio reescribió `RolModuloPermisoRepository` sin `findModulosPermitidosByRoles` (rompe login). Rechazar y corregir partiendo del dump.
-- Los tests de escritura RBAC usan rol dummy creado en el turno (`test_139d_rol_perm`), no rol 2 (seed). Cascada limpia `rol_modulo*` al borrar el rol.
-- Body JSON en subproceso CLI viaja por `base64_encode`/`base64_decode` para evitar corrupción de `escapeshellarg` en Windows.
-
-**Reglas nuevas heredadas de 139d Tanda D/E:**
-- Body JSON en CLI de Windows: `Set-Content -Encoding utf8` de PowerShell 5.1 agrega BOM (síntoma: `json_decode` devuelve null → backend cae a `$_POST` vacío → 400 "Credenciales incompletas"). Usar `[System.IO.File]::WriteAllText` sin BOM.
-- Todo archivo PHP nuevo debe empezar con `<?php` en la línea 1. Comentario `// filename` en línea 2. **Nunca** al revés. Síntoma: `header()` falla con "headers already sent" y JSON/CSS llega con prefijo de texto.
-- `findstr /S /C:"require" *.php | findstr /C:"conexion.php"` produce falsos positivos (el prefijo `archivo:` del output matchea el segundo filtro). Verificar "0 refs ejecutables" con strings literales completos (`require_once __DIR__ . '/conexion.php'`), no con pipes.
-
-## Próximos pasos
-
-1. **Spec 140** — Fase 1. Frontend modular (`js/`) + borrar `app.js`.
-3. **Fase 2 — Deudas heredadas de MVC** (BUG-6.1, DOC-04/05/08/09, EST-02/03, 060, deudas de contrato).
-4. **Fase 3 — UI/UX bonita** (078–085).
-5. **Fase 4 — Botón Roles + permisos en grilla** (084 + tareas sin número).
-6. **Fase 5 — Portal + Notificaciones** (096a–f + 086a–h).
-7. **Fase 6 — Título del proyecto**.
-8. **Fase 7 — Resto** (~61 specs).
+**Portal (8/8 cerrados):** Auth (096a), Servicios (096e), Facturas (096b), Pagos (096c), Tickets (096d), PDF factura (096f), **Notif cliente (086d)**. Cerrado el 2026-11-02.
 
 ---
 
-## Registro maestro de deudas
+## Orden del proyecto (aprobado 2026-11-02)
 
-**Regla:** toda deuda detectada entra aquí con ID único, origen, fase asignada y flag "bloquea defensa". Ninguna deuda sale de esta tabla sin su fase cerrada. Si algo no está aquí, no existe.
-
-**Origen:**
-- `[conv]` — estaba en la conversación pegada.
-- `[plan]` — estaba en el plan original de 139.
-- `[audit-turno]` — detectada en auditoría de turnos previos.
-- `[audit-139b]` — detectada al auditar y verificar 139b (2026-10-18).
-- `[audit-139c]` — detectada al auditar y verificar 139c (2026-10-18).
-- `[audit-139d]` — detectada al auditar y verificar 139d (2026-10-18).
-
-### A. Fase 1 — MVC (bloqueantes)
-
-| ID | Sev | Descripción | Origen | Spec | ¿Bloquea defensa? |
-|---|---|---|---|---|---|
-
-**Cerradas al cierre de 139e (histórico):**
-- **139e-webroot** — código movido a `src/`, thin files a `public/`. `core/Config.php` por URL -> 404. `.htaccess` raíz conservado como defensa en profundidad. ADR 018. Verificado E2E (6.10, 6.11, 6.12).
-
-**Cerradas al cierre de 139d (histórico):**
-- **139d-endpoints** — 2 endpoints con columnas viejas post-B28 (`api_empresa`, `api_empresa_publica`). ✅ cerrada en Tanda D.
-- **A3** — `branding.css.php` requería `conexion.php`. ✅ cerrada en Tanda D (reescrito como thin CSS).
-
-### B. Deudas de contrato (heredadas de MVC, resueltas en Fase 1/2)
-
-| ID | Sev | Descripción | Origen | Fase | ¿Bloquea defensa? |
-|---|---|---|---|---|---|
-| **139b-1** | Media | `ServicioController::index`, `ContratoController::index`, `FacturaController::index`, `PagoController::index` usan `Repository::findAll()` sin JOINs. Campos `servicio_alias`, `cliente_nombres`, `cliente_apellidos`, `plan_nombre`, `nap_codigo`, `direccion_texto` desaparecen del JSON. **Cubre 4 endpoints, no 3.** | [audit-139b] | 140 | **No** |
-| **139b-2** | Baja | `ServicioController::update` valida `direccion_texto` pero no persiste cambios en `direccion_servicio`. | [audit-139b] | 139-bis o 140 | **No** |
-| **139b-3** | Media | Frontend viejo manda `id_servicio`, `id_cliente`, `id_factura`, `id_metodo`, `id_plan`, `id_naps` (pre-B28). Backend nuevo espera `servicio_id`, `cliente_id`, `factura_id`, `metodo_id`, `plan_id`, `nap_id` (post-ADR 016). **El frontend viejo no puede crear ni editar nada.** | [audit-139b] | 140 | **No** |
-| **139c-1** | Media | 7 `index()` de infra/soporte (Nodo, Olt, Nap, Equipo, Ticket, Tarea, Pedido) sin JOINs. Mismos campos enriquecidos que 139b-1 (`total_olts`, `total_naps`, `clientes_conectados`, `nap_codigo`, `cliente_nombres`, `servicio_alias`, `direccion_texto`, `equipo_count`) desaparecen del JSON. | [audit-139c] | 140 | **No** |
-| **139c-2** | Media | Sidebar del frontend viejo muestra "Pedidos de campo" (porque `renderMenu` lee `rol_modulo_pagina`) pero `app.js` no tiene `showPage('pedidos')`. Clic sin efecto visible. | [audit-139c] | 140 | **No** |
-| **139c-3** | Media | `EquipoController::index()` sin filtro devuelve solo `estado_inventario='stock'`. El endpoint viejo devolvía todos. El frontend nuevo debe pedir filtro explícito. | [audit-139c] | 140 | **No** |
-| **139c-4** | Media | Operador (rol 2) no tiene `leer` en `rol_modulo_permiso` para `tickets` (pagina_id=5) ni `tareas` (pagina_id=4). GET como Operador → 403. El seed RBAC del Operador está incompleto. | [audit-139c] | Fase 2 | **No** |
-| **139c-5** | Baja | `PedidoService::asignarTecnico` no se expone en `PedidoController`. `update()` acepta `tecnico_asignado_id` sin validar que el pedido no esté completado/cancelado. | [audit-139c] | 140 | **No** |
-
-### C. Deudas de fases futuras (Fases 2–7)
-
-| ID | Sev | Descripción | Origen | Fase | ¿Bloquea defensa? |
-|---|---|---|---|---|---|
-| **BUG-6.1** | Crítico | Permisos no se aplican en tiempo real. `restoreSession()` no limpia `window.*Cache` cuando la sesión es válida. | [conv] | Fase 2 | **No** (curl funciona; demo puede mostrar caché stale) |
-| **F08** | Medio | Cachés `window.*Cache` no se limpian al logout. Overlap con BUG-6.1. | [conv] | Fase 2 (con BUG-6.1) | **No** |
-| **Overlay-F5** | Medio | `restoreSession()` no oculta `#login-overlay` tras restauración válida. En F5 con sesión activa, reaparece el modal. | [conv] | Fase 2 | **No** (solo UX) |
-| **MAP-01** | Medio | Página `mapa` no tiene endpoint propio. Checkboxes de operación huérfanos. | [conv] | Fase 4 | **No** |
-| **EST-01** | Medio | Páginas sin CRUD propio (`dash`, `mapa`, `reportes`, `notificaciones`, `password`). Nivel 2 huérfano. | [conv] | Fase 4 | **No** |
-| **UX-01** | Bajo | `<select id="contrato-estado">` en modal "Nuevo contrato" ofrece `vencido` y `rescindido`, pero el backend siempre fuerza `vigente`. | [conv] | Fase 4 | **No** |
-| **B15** | Medio | Password temporal `'Redytelca123!'` hardcoded en `UsuarioController::store`. | [plan] | Fase 7 (028) | **No** |
-| **B13** | Medio | `id_plan=1` hardcoded en `registrar_cliente.php` si no viene plan. | [plan] | Fase 7 (027) | **No** |
-| **B14** | Medio | Password ≥8 chars; NIST SP 800-63B pide ≥15 (single-factor). | [plan] | Fase 7 (028) | **No** |
-| **139d-1** | Bajo | `roles_eliminar.php` mantiene POST por compatibilidad con el frontend viejo. En 140 el frontend nuevo puede usar DELETE. Se unifica en 140. | [audit-139d] | 140 | **No** |
-| **139d-2** | Bajo | `EmpresaController::store` sube archivo antes de validar campos. Si el service falla, se hace `@unlink($logoPath)`. Implementado en 139d; se verifica end-to-end en 140 si la UI cambia. | [audit-139d] | 139d (impl) / 140 (verif) | **No** |
-| **139d-3** | Bajo | Quedan 5 métodos con SQL crudo en `AuthService` y `UsuarioService`: `cargarRolesUsuario`, `cargarModulosPermitidos`, `asignarRoles`, `listarRoles`, `contarOtrosAdminsActivos`, `desactivar`. Cierran 136f-bis en Fase 2. | [audit-139d] | Fase 2 | **No** |
-
-### D. Deudas documentales
-
-| ID | Sev | Descripción | Origen | Fase | Estado |
-|---|---|---|---|---|---|
-| **DOC-04** | Media | `ARQUITECTURA.md` y `BD.md` dicen `utf8mb4_general_ci`; la BD es `utf8mb4_unicode_ci`. | [conv] | Fase 2 | ⏳ |
-| **DOC-05** | Media | `ARQUITECTURA.md` y `BD.md` no listan las 17 tablas nuevas de BD-COMPLETA. | [conv] | Fase 2 | ⏳ |
-| **DOC-07** | Media | `ROADMAP.md` listaba specs absorbidas por BD-COMPLETA como pendientes. | [conv] | — | ✅ auto-resuelta 2026-10-18 |
-| **DOC-08** | Baja | ADR 013 dice que `notificaciones_staff` no tendría triggers de auditoría; P4 sí los creó. | [conv] | Fase 2 | ⏳ |
-| **DOC-09** | Baja | `bd_redytelca_schema.sql` desactualizado (pre-P14/P15, dice 48 tablas; la BD tiene 44). Regenerar. | [conv] | Fase 2 | ⏳ |
-| **DOC-10** | Media | `MEMORY.md` y `ROADMAP.md` stale sobre 135–139b. | [audit-turno] | — | ✅ auto-resuelta 2026-10-18 |
-| **DOC-11** | Baja | `ROADMAP.md` tenía el bloque `BLOQUE 0` duplicado. | [audit-turno] | — | ✅ auto-resuelta 2026-10-18 |
-| **DOC-12** | Media | `ROADMAP.md` contradicción sobre 096 (diferido vs reactivado). | [audit-turno] | — | ✅ auto-resuelta 2026-10-18 |
-| **DOC-13** | Media | Bloques 30/31 absorbidos por 139/140 no documentado formalmente. | [audit-turno] | — | ✅ auto-resuelta 2026-10-18 |
-| **EST-02** | Media | `sla_definiciones` solo tiene 3 de 8 combinaciones (falta Instalación y Baja). | [conv] | Fase 2 | ⏳ |
-| **EST-03** | Baja | `email_plantillas` solo tiene 6 de ~9 eventos (falta ticket_creado, pago_pendiente, pago_rechazado). | [conv] | Fase 2 | ⏳ |
-
-**Nota:** DOC-07, DOC-10, DOC-11, DOC-12 y DOC-13 se auto-resolvieron al reescribir `ROADMAP.md` el 2026-10-18. No aparecen como deudas vivas; se conservan aquí para trazabilidad.
-
-### Bugs detectados y su estado
-
-| ID | Sev | Estado | Fix |
-|---|---|---|---|
-| **BUG-6.2** | Alto | ✅ resuelto (2026-10-18, Tanda B) | `Auth::requireStaffAuth($pdo, $minRoleId, $bypassMustChangePassword)` + `cambiar_password.php` con bypass=true. Verif. 6/6 + no-daño verde. |
-| **BUG-6.3** | Alta | ✅ resuelto (2026-10-18) | `unset($input['id_pago'])` en `PagoController::update`. |
-| **BUG-6.4** | Alta | ✅ resuelto (2026-10-18) | `unset($input['id_factura'])` en `FacturaController::update`. |
-
-### Resumen ejecutivo
-
-| Categoría | Total | Bloquean defensa |
+| # | Bloque | Estado |
 |---|---|---|
-| A. Fase 1 (bloqueantes) | 0 | **0** |
-| B. Contrato (heredadas de MVC) | 9 | 0 |
-| C. Fases futuras (2–7) | 13 | 0 |
-| D. Documentales vivas | 5 | 0 |
-| D. Documentales auto-resueltas | 5 | — |
-| Bugs (3 fixed) | 3 | 0 |
-| **Total deudas vivas** | **27** | **0** |
+| 1 | Fase 1 — MVC | ✅ cerrada 2026-10-30 |
+| 2 | Cierre documental (F2.0b) | ✅ cerrada 2026-10-31 |
+| 3 | Fase 4 — Roles + permisos en grilla | ✅ cerrada 2026-10-31 |
+| 3.5 | Tanda de fixes 2026-10-31 | ✅ cerrada 2026-10-31 |
+| 3.6 | A2-B.1 — Notificaciones backend | ✅ cerrada 2026-10-31 |
+| 3.7 | A2-B.3 — Portal auth backend | ✅ cerrada 2026-10-31 |
+| 3.8 | A2-B.4 — Portal facturas/pagos/servicios backend | ✅ cerrada 2026-11-01 |
+| 3.9 | A2-B.5 — Portal tickets/respuestas backend | ✅ cerrada 2026-11-01 |
+| 4 | **Fase 5 — Portal + Notificaciones (UI)** | **✅ cerrada 2026-11-02** (086c, 096a, 096e, 096b, 096c, 096d, 096f, 086d) |
+| 5 | **Fase 2 — F2.0a + 38 specs F2.1–F2.38** | **⏳ siguiente** |
+| 6 | A2-B.2, A2-B.6, A2-B.7 (backend Fase 7) | ⏳ |
+| 7 | Fase 7 — Resto | ⏳ |
+| 8 | Fase 3 — UI/UX bonita | ⏳ |
 
 ---
 
-## Hallazgos operativos cerrados (histórico)
+## Deudas vivas (por fase)
 
-Deudas cerradas en bloques/fases previas. Se conservan por trazabilidad.
+### Fase 5 (resto)
 
-### Absorciones estructurales (2026-10-18)
-
-| ID | Descripción | Absorbido por |
+| ID | Deuda | Se cierra en |
 |---|---|---|
-| **ABS-30-31** | Bloques 30 (backend adaptado) y 31 (frontend adaptado + UI) absorbidos por Fase 1 (139) y Fase 3 (UI/UX). El trabajo de "UI más bonita" del viejo Bloque 31 vive en Fase 3 (specs 078–085). | Fase 1 + Fase 3 |
-| **ABS-32** | Bloque 32 (Portal + Notificaciones) desaparece como bloque separado. Su contenido vive en Fase 5 (096a–f + 086a–h). | Fase 5 |
-| **ABS-33** | Bloque 33 (Botón Roles + permisos grilla) desaparece como bloque separado. Su contenido vive en Fase 4 (084 + tareas). | Fase 4 |
-| **ABS-portal** | Deuda `Portal-stub` (portal_cliente.php sin endpoints). Absorbida por Fase 5 (096a). | Fase 5 |
-| **ABS-notif** | Deudas `Notif-vacía` (notificaciones vacía) y `Portal-creds` (clientes_credenciales vacía). Absorbidas por Fase 5 (086a–d + 096a). | Fase 5 |
+| **A2-B.4-TEST** | `src/tests/verify_a2b4.php` no existe. 096d NO lo creó (la spec 096d se enfocó en portal categorías ticket + UI tickets). La verificación de A2-B.4 se ejecutó ad-hoc (documentada en `VERIFICACION.md` §2.43–§2.45). Crear el archivo formal (~25 checks). | **Fase 2** |
+| **PORTAL-TICKET-BUSQUEDA-AVANZADA** | Búsqueda por SLA, fecha, categoría, técnico. En 096d solo filtro `estado` + `prioridad` (server-side). El texto libre no se implementó porque la paginación es server-side y un filtro client-side solo vería la página actual. | Fase 2 (si aplica) |
+| **FACTURA-FISCAL-SENIAT** | El PDF de factura es informativo, no fiscal. SENIAT exige número de control, RIF del emisor y del receptor, y datos fiscales que el esquema actual no tiene. Aviso explícito en el footer del PDF. | Fase 7 (si aplica) |
 
-### Deudas cerradas en 139d Tanda A (2026-10-18)
+**Resueltas en Fase 5:**
+- `PORTAL-CATEGORIAS-TICKET` — ✅ 096d (2026-11-02).
+- `PORTAL-FACTURA-PDF` — ✅ 096f (2026-11-02).
+- `PORTAL-PAGOS-A-CUENTA` — ✅ 096c (2026-11-01).
 
-| ID | Descripción | Verificación |
-|---|---|---|
-| **136f-bis (parcial)** | 8 métodos de services con SQL crudo migrados a 4 repos de pivots: `AuthService::cargarRolesUsuario`, `AuthService::cargarModulosPermitidos`, `UsuarioService::asignarRoles`, `UsuarioService::listarRoles`, `UsuarioService::contarOtrosAdminsActivos`, `UsuarioService::desactivar`, `RolService::eliminar`, `PermisoService::eliminar`. | `tests/verify_139d_a.php`: 23/23 verde. |
-| **139d-A-1** | `revocarByToken`/`revocarTodasByUsuarioId` fallaban con `chk_sesion_expira` si login y logout caían en el mismo segundo. Fix aplicado: `GREATEST(UTC_TIMESTAMP(), DATE_ADD(creado_en, INTERVAL 1 SECOND))`. | Segunda pasada de `verify_139d_a.php`: 23/23 (antes: 21/22 con race). |
+### Fase 2 (F2.0a + 38 specs F2.1–F2.38)
 
-### Deudas cerradas en 139d Tanda C (2026-10-18)
+- **F2.0a** — auditoría de usabilidad pre-Fase 2.
+- **F2.1–F2.38** — 38 specs de dominio. Detalle en `docs/ROADMAP.md` §Fase 2.
+- **A2-B.4-TEST** — `verify_a2b4.php` (heredada de Fase 5).
+- **BUG-ENTER-TAREA-TICKET** — Enter + `_saving` en `TareaController.save()` y `TicketController.save()`.
+- **UX-PERFIL-ESTADO-SESION / UX-PERFIL-LIMIT-AMBIGUO / UX-PAGO-RECHAZAR / UX-PERM-BOTONES** — 4 deudas Capa 2 diferidas a F2.0a.
+- **F-16** — `onclick`/`oninput` inline en `index.html`.
+- **B3.8-DOC-SIDEBAR** — `categorias-ticket` y `sla-definiciones` sin nav-item (hack temporal en `main.js`).
+- **B3.8-ROUTER-PARENT** — `Router.showPage('categorias-ticket')` sin nav-item.
+- **AUDIT-IP-NULL** — 129 triggers de auditoría no escriben `ip_address`.
+- **AUDIT-DUMMIES-SEED** — dummies de B3.5–B3.15 en `auditoria_logs` + `logo.*` huérfanos + credenciales de portal de 096a–096f.
+- **LOGOS-GEMINI-RENOMBRADOS** — `public/Logos/` con nombres raros.
+- **BD-REF-VERIFICACION-37-39** — `BD.md` cita `VERIFICACION.md` §2.37–§2.39, inexistentes.
+- **EST-02** — `sla_definiciones` "3 de 8" combinaciones. Número a reconciliar contra `bd_redytelca.sql` (probablemente "3 de 12": 4 categorías × 3 prioridades).
+- **PORTAL-URL-REWRITE** — `/portal` requiere `.htaccess` con RewriteRule en Apache. Hoy se usa `portal_cliente.php` directamente.
+- **PORTAL-CREDENCIAL-UI** — Botón "Resetear credencial del portal" en la ficha del cliente. Detectado en 096e (2026-11-01).
+- **PORTAL-CREDENCIAL-PASSWORD-OCULTA** — La UI descarta el `password_temporal` al crear cliente. Detectado en 096e (2026-11-01).
 
-| ID | Descripción | Verificación |
-|---|---|---|
-| **G1** | `roles_listar.php` ya no inserta semilla cuando `rol` está vacía. La migración `2026-10-18-139c-pedidos-rbac.sql` ya sembró los 2 roles base. | `tests/verify_139d_c.php` C1/C4: sin semilla, id_rol > 2. |
-| **136f-bis (rol_modulo*)** | `PermisoService::guardarMatriz` ya no tiene SQL inline. Delega en `RolModuloRepository`, `RolModuloPaginaRepository`, `RolModuloPermisoRepository` (con `findByRolId`, `deleteByRolModuloId`, `insertIgnore`, `ensure`). Cierra la deuda 136f-bis para los pivots de RBAC. | `tests/verify_139d_c.php` C11: escritura verificada en `rol_modulo_pagina` y `rol_modulo_permiso`. |
+### Fase 7 (backend Fase 7)
 
-### Deudas cerradas en 139d Tanda D (2026-10-18)
-
-| ID | Descripción | Verificación |
-|---|---|---|
-| **139d-endpoints (parte D)** | `api_empresa.php` y `api_empresa_publica.php` reescritos como thin, con `EmpresaController` (nuevo) que delega en `EmpresaService`. Ya no usan `conexion.php` ni SQL inline. | E2E D1–D3.verif: GET Admin 200 (config completo), GET Operador 403 (SoD), POST sin logo 200 + persistencia en BD. |
-| **A3** | `branding.css.php` reescrito como thin CSS con `Http::init()` + `ConfiguracionEmpresaRepository::findPublicBranding()`. Ya no requiere `conexion.php`. | E2E D7: 200 con `Content-Type: text/css` y `:root { --accent: #104aa8; ... }`. E2E D8: fallback a `#104aa8` con color corrupto. |
-| **139d-2 (impl)** | `EmpresaController::store` implementa `@unlink($logoPath)` en el catch si el service falla. Cleanup de archivo huérfano. | E2E D5: upload .txt → 422 con `errors.logo`, sin archivo en `uploads/empresa/`. Verificación end-to-end en 140 cuando la UI suba archivos reales. |
-| **B09 (parcial)** | `api_empresa_publica.php` devuelve solo 3 campos (`nombre_empresa`, `logo_path`, `color_primario`). Config sensible (`impuesto_porcentaje`, `dia_facturacion`, `dias_gracia_mora`, `monto_recargo_mora`, `dias_corte_automatico`) ya no se expone sin auth. | E2E D6: 200 con solo 3 campos, sin `impuesto_porcentaje` ni días. |
-
-### Deudas cerradas en 139d Tanda E (2026-10-18)
-
-| ID | Descripción | Verificación |
-|---|---|---|
-| **51 / 087 / A2 (cierre)** | `conexion.php` eliminado. Sus 9 funciones deprecadas ya no existen. Todos los thin files usan `core/Bootstrap.php` + `core/Auth.php` + `core/Http.php`. | 4× `findstr` de patrones de `require` a `conexion.php` → 0 líneas. `dir conexion.php` → File Not Found. `php tests/run.php` → 9/9. |
-| **tests/audit_context.test.php** | Migrado de `require_once conexion.php` + `global $pdo` + `setAuditContext(...)` a `require_once core/Bootstrap.php` + `Bootstrap::init()` local + `Auth::setAuditContext(...)` + `use ($pdo)` en closures. | `php -l` sin errores. `php tests/run.php` → 5/5 tests de auditoría + 4/4 smoke = 9/9. |
-
-### Deudas nuevas Tanda A (139d)
-
-| ID | Sev | Descripción | Cierre |
-|---|---|---|---|
-| **139d-A-2** | Bajo | `Auth::requireStaffAuth` no filtra `revocado_en IS NULL`. Un token revocado en el mismo segundo del logout puede ser aceptado ≤1s por `requirePageAccess`/`requireOperation`. `validateSession` sí rechaza. | Spec RBAC-auth o Tanda E. |
-| **139d-A-3** | Bajo | `RolService::eliminar` confía en `ON DELETE CASCADE` de `rol_modulo*` sin comentario. Funciona (FKs verificadas), pero el comportamiento no es explícito en el código. | Documentar en ADR 008 o Tanda C. |
-
-### Deudas nuevas Tanda B (139d)
-
-| ID | Sev | Descripción | Cierre |
-|---|---|---|---|
-| **139d-B-1** | Bajo | `Auth::jsonError()` serializa sin `JSON_UNESCAPED_UNICODE`; los mensajes de error con acentos salen como `\u00f1`. Inconsistente con `Response::json()`, que sí usa la flag. Rompe asserts textuales contra mensajes de Auth. | Fase 2. |
-
-### Hallazgos operativos cerrados (previos)
-
-| ID | Sev | Descripción | Resuelto con |
-|---|---|---|---|
-| RBAC-01 | Bajo | Plan RBAC 099 desactualizado. | Corregido en `PLAN-RBAC-DOS-NIVELES.md`. |
-| RBAC-02 | Crítico | SoD de Configuración solo en UI. | Bloque 18 (spec 100). |
-| RBAC-03 | Medio | Endpoints de clientes sin RBAC nivel 2. | Fase 2 del Rediseño de Servicios. |
-| CODE-01 | Alto | `registrar_cliente.php` insertaba `'activo'` violando trigger. | Cambio a `'pendiente'`. |
-| CODE-02 | Medio | `api_equipos.php` asumía UNIQUE obsoleto. | Retiro de `es_principal`. |
-| CODE-03 | Alto | GET `api_empresa.php` con side-effect. | Spec 021. |
-| CODE-04 | Medio | PUT `api_facturas.php` sin validar periodo ni capturar 1062. | Spec 021. |
-| CODE-05 | Medio | POST `api_contratos.php` aceptaba estados inválidos. | Spec 021. |
-| CODE-06 | Medio | PUT `api_naps.php` no exigía lat/lon. | Spec 021. |
-| CODE-07 | Medio | PUT `api_nodos.php` no exigía `nombre`. | Spec 021. |
-| CODE-08 | Medio | PUT `api_olts.php` no exigía campos. | Spec 021. |
-| CODE-09 | Medio | PUT `api_nodos.php` no exigía lat/lon. | Spec 021. |
-| CODE-12 | Medio | `api_pagos.php` POST con `'status' => 'ok'` literal. | Corregido en P13 Tanda 2. |
-| DOC-03 | Bajo | Color `#104aa8` inconsistente. | Spec 021. |
-| UI-01 | Bajo | Header de `clientes-table` desalineado. | Spec 021. |
-| UI-02 | Bajo | Header de `contratos-table` desalineado. | Spec 021. |
-| UI-03 | Bajo | Fix aplicado. | 2026-10-13. |
-| UI-04 | Bajo | Mensajes genéricos cuando trigger 45000 (MySQL 1644). | ✅ Cerrado por H1 (139b, runtime confirmado). |
-| DB-01 | Bajo | UNIQUE redundante en `sesiones`. | `DROP INDEX`. |
-| DB-08 | Medio | Confusión `monto`+`moneda`+`tasa_cambio`. | P13b: Opción B con COMMENTs + UI. |
-| DB-09 | — | `v_estado_cuenta_cliente` con saldo incorrecto. | P10. |
-| DB-10 | — | `tickets.sla_vence_en` nunca se poblaba. | P12. |
-| DB-11 | Alta | `equipos` sin `chk_equipo_estado_servicio`. | P12. |
-| DB-12 | Media | `planes` sin CHECKs de velocidad. | P14-bis. |
-| DB-13 | Baja | `sesiones.creado_en` no era `datetime`. | P9. |
-| DB-14 | Alta | P8b habría descartado 6 CHECKs. | Falso positivo: verificados con `information_schema`. P15 los repuso. |
-| DB-15 | Baja | `v_facturas_con_saldo` sin `GREATEST(...,0)`. | P15 PASO 6. |
+- **A2-B.2** — notas crédito/débito.
+- **A2-B.6** — email (`email_plantillas`, `email_log`, `MailerService`).
+- **A2-B.7** — `notificar()` escribe en `email_log`.
+- **PORTAL-PAGO-RATE-LIMIT / PORTAL-TICKET-RATE-LIMIT** — rate limiting.
+- **PORTAL-COMPROBANTE-PURGA** — comprobantes no se purgan.
+- **PORTAL-MFA** — sin segundo factor para clientes.
+- **PORTAL-TICKET-ADJUNTOS** — sin adjuntos en tickets/respuestas del portal.
+- **PORTAL-TICKET-REABRIR** — `Cerrado` terminal. Reabrir requiere estado `Resuelto`.
+- **PORTAL-TICKET-ASIGNAR-TECNICO** — sin asignar técnico desde el portal.
+- **PORTAL-TICKET-URGENCIA** — sin marcar urgencia (impacto × urgencia, ITIL).
+- **NOTIF-ROL-GRANULARIDAD** — destinatarios staff = solo rol 1 activo.
+- **NOTIF-ESTADO-LEGACY** — enum `estado` convive con `leida_en`.
+- **NOTIF-IDEMPOTENCIA** — sin idempotencia.
+- **NOTIF-TICKET-ASIGNADO** — no se notifica al técnico asignado.
+- **BILLING-DIA-FACTURACION-INERTE / BILLING-GRACIA-MORA-INERTE / BILLING-CORTE-AUTOMATICO-INERTE** — 4 parámetros de `configuracion_empresa` sin usar.
+- **118i** — LOGIN/LOGOUT/LOGIN_FALLIDO no se registran en `auditoria_logs`.
 
 ---
 
 ## Decisiones de proceso vigentes
 
-### Frameworks — `[PENDIENTE]`
+Reglas operativas del repo → `AGENTS.md`. Aquí solo las decisiones de proceso específicas:
 
-El docente podría haber mencionado frameworks como permitidos a un compañero. **No hay confirmación directa.** Si se confirma: evaluar reescritura vs. mantener monolito modular. **Recomendación:** NO reescribir. Documentar como decisión de alcance.
-
-### Reasignación de cliente en un servicio — fuera de alcance
-
-El cliente de un servicio NO se puede cambiar desde el formulario de edición. La reasignación es una operación administrativa separada (patrón Splynx "Migrate services"), con su propio permiso y auditoría.
-
-### 136f-bis — opción B confirmada, cerrada para rol_modulo*
-
-SQL crudo en 8 métodos de services. Tanda A migró los 8 a repos. Tanda C añadió `listarMatriz` al service, reemplazando el SQL inline de `permisos_listar.php`. La deuda 136f-bis queda cerrada para `rol_modulo*` (los 4 repos de pivots tienen todos los métodos necesarios). Quedan 5 métodos con SQL crudo en `AuthService` y `UsuarioService` que se cierran en Fase 2 (deuda 139d-3).
-
-### Tests de DELETE — solo con dummies
-
-Regla nueva (2026-10-18). Cada test de DELETE positivo usa un dummy creado con POST en el mismo turno. **Nunca IDs del seed.** Origen: durante la verificación de 139b se borró contrato 10 (seed real) por error de diseño del test D2. Restaurado desde `auditoria_logs`.
-
-### `unset($input['id_X'])` en cada `update()`
-
-Regla nueva (2026-10-18). Cada `update()` de controller debe hacer `unset($input['id_X'])` antes de pasar `$input` o `$validated` al service. Origen: BUG-6.3 y BUG-6.4, ambos por pasar el ID al `BaseRepository::update` que genera `SET id_X = ?`.
-
-### Migración RBAC primero, código después (139c)
-
-Regla nueva (2026-10-18). Antes de escribir controllers que dependen de una página en `paginas`, se aplica la migración SQL (insertar página + roles + permisos) y se verifica con triggers de auditoría. Origen: 139c opción B (pedidos en RBAC).
-
-### AI Studio puede regresar archivos sin métodos existentes (139d Tanda C)
-
-Regla nueva (2026-10-18). Cuando AI Studio entrega un archivo "modificado", verificar que conserva todos los métodos del dump. En Tanda C, AI Studio:
-- Reescribió `RolModuloPermisoRepository` sin `findModulosPermitidosByRoles` (rompe login).
-- Revirtió `PermisoService::guardarMatriz` a SQL inline (viola 136f-bis).
-- Cambió `insertIgnore` de 3 ints a array (rompe Tanda A).
-
-Rechazar la entrega y corregir partiendo del dump + Tanda A, no de la entrega de AI Studio.
-
-### Tests RBAC con rol dummy (139d Tanda C)
-
-Regla nueva (2026-10-18). Los tests que escriben en `rol_modulo*` usan un rol dummy creado en el turno (`test_139d_rol_perm`), no el rol 2 (seed). Cascada limpia las tablas hijas al borrar el rol. Cero residuo en `rmpag`/`rmperm`.
-
-### Body JSON en subproceso CLI (139d Tanda C)
-
-Regla nueva (2026-10-18). En `cmd` de Windows, `escapeshellarg` corrompe JSON con comillas. El body viaja por `base64_encode`/`base64_decode`. Los tests que simulan HTTP en CLI usan este patrón.
-
-### Body JSON en CLI de Windows — BOM (139d Tanda D/E)
-
-Regla nueva (2026-10-18). `Set-Content -Encoding utf8` en PowerShell 5.1 agrega BOM. Para JSONs enviados a `php://input`, usar `[System.IO.File]::WriteAllText` (sin BOM). Síntoma: `json_decode` devuelve `null`, backend cae a `$_POST` vacío, responde 400 "Credenciales incompletas". Detectable con `[System.IO.File]::ReadAllBytes` → primeros 3 bytes `239,187,191` = BOM presente.
-
-### 139e — estructura `public/` + `src/` aprobada (2026-10-18)
-
-Decisión de estándar, no de comodidad. Hoy el código fuente (`core/`, `controllers/`, `services/`, etc.) está dentro del webroot. Cualquier petición a `http://127.0.0.1/redytelca/core/Config.php` ejecuta el archivo por URL. La mitigación correcta no es `.htaccess` frágil, es sacar el código del webroot. Patrón de Laravel, Symfony, CodeIgniter y el manual oficial de PHP: `public/` como DocumentRoot, `src/` para el código. Se ejecuta entre 139d y 140, con ADR 018. Constitución §10: el estándar manda, no la comodidad.
-
-### ADRs pendientes
-
-Dos decisiones arquitectónicas implementadas sin ADR formal:
-- Servicio como entidad de primer nivel en la UI. Fundamento: Splynx, Omnitouch, PortaOne, TM Forum SID.
-- GET sin side-effects vía endpoint POST dedicado. Fundamento: CWE-650, RFC 7231, Google Cloud Scheduler, AWS EventBridge.
+- **Orden del proyecto:** Fase 4 ✅ → tanda fixes 2026-10-31 ✅ → A2-B.1 ✅ → A2-B.3 ✅ → A2-B.4 ✅ → A2-B.5 ✅ → **Fase 5 ✅ (086c, 096a, 096e, 096b, 096c, 096d, 096f, 086d)** → **Fase 2 (F2.0a + F2.1–F2.38)** → A2-B (resto) → Fase 7 → Fase 3.
+- **Siempre archivo completo, nunca fragmento.** Endurecida 2026-10-27 y 2026-10-31.
+- **Replicar el fix en todos los módulos afectados en el mismo turno.**
+- **No diferir un bug expuesto por el fix actual.**
+- **Solo `MEMORY.md` se reduce.** Los docs de disco duro solo se amplían o modifican quirúrgicamente.
+- **Verificación de aquí en adelante:** 1 comando de sintaxis (`php -l` + `node --check` todos juntos) + pruebas browser. Sin pasos CLI intermedios.
+- **Al cerrar cada spec:** actualizar `MEMORY.md`. Al cerrar un punto completo (como 086d): también `ROADMAP.md`. Los demás docs (`ARQUITECTURA.md`, `BD.md`) al cerrar la fase completa.
+- **`Router.showPage` cierra modales + resetea scroll.**
+- **Portal: endpoints separados de los admin** (BOLA/IDOR).
+- **Portal: `cliente_id` de la sesión, nunca del body.**
+- **Portal: SVG prohibido en comprobantes** (XSS).
+- **Portal: `must_change_password` enforced en `Auth::requireClientAuth` sin bypass.**
+- **Portal: `window.__appContext = 'portal'`** seteado en `js/portal/main.js` ANTES de cualquier fetch. `ApiClient` elige `PortalSession` vs `Session` según este flag. Sin esto, el portal manda el token del admin en cada request → 401. Bug encontrado y corregido en 096a (2026-11-01). **Cualquier HTML nuevo del portal debe setear `__appContext` antes de cargar `ApiClient` o antes del primer fetch.**
+- **Portal: `PortalSession` y `Session` coexisten** (claves `redytelca_portal_session` y `redytelca_session`). Admin + portal abiertos a la vez en el mismo navegador. Fundamento: Bagisto multi-guard, Yii2 multi-tenant.
+- **Portal: `PortalRouter` es fork de `Router`** (SECTION_MAP propio: Servicios, Facturas, Pagos, Tickets). Misma regla de "cerrar modales + reset scroll".
+- **Portal: `PortalServicioModel` usa `per_page=100`** y pagina client-side (`PAGE_SIZE=10`). Los servicios por cliente son pocos.
+- **Portal: `PortalFacturaModel` usa paginación server-side** (`per_page=20`), porque el número de facturas puede crecer. Filtros `estado` + `periodo` vía query params.
+- **Portal: `PortalPagoModel` pagina server-side** (`per_page=20`). Filtros `estado` vía query params.
+- **Portal: `PortalTicketModel` pagina server-side** (`per_page=20`). Filtros `estado` + `prioridad` vía query params. **Búsqueda por texto NO implementada** (client-side sobre página actual confunde; server-side requeriría cambio de backend).
+- **Portal: detalle de factura, pago y ticket lee nombre y cédula de `PortalSession.get().cliente`.** A2-B.4 decidió NO devolver `nombres`/`apellidos`/`cedula` en endpoints del portal (el cliente ya se conoce a sí mismo). Fallback a `factura.nombres`/`pago.nombres`/`ticket.nombres` por si el backend los añade en el futuro.
+- **Portal: descarga de comprobante vía `fetch` con `X-Session-Token` → blob → download.** El endpoint `api_portal_comprobante.php` requiere auth.
+- **Portal: `tipo_autor` forzado en el service, nunca desde el body.**
+- **Portal tickets: `Cerrado` terminal para el cliente.** Zendesk: *"Closed is forever. There's no reopening a Closed ticket"*. El botón "Enviar respuesta" y el textarea se deshabilitan. Mensaje: *"Crea un ticket nuevo para continuar la conversación."*
+- **Portal tickets: `usuario_creador_id=NULL`.**
+- **Portal PDF: `window.print()` con popup HTML print-friendly, sin librerías.** El PDF es informativo, no fiscal. Footer con aviso explícito de SENIAT. Deuda `FACTURA-FISCAL-SENIAT` a Fase 7.
+- **Portal notificaciones (086d): `startPolling()` hace `_pollOnce()` inicial.** Sin el fetch inicial, el badge queda vacío hasta el primer tick (30s). Se arranca desde `initApp()` post-login (staff) o `window.__onPortalLoginSuccess` post-login/restore (portal). **NO se arranca en `DOMContentLoaded` sin sesión** — el fetch inicial daría 401 y el badge quedaría vacío hasta el primer tick válido.
+- **Portal notificaciones (086d): `PortalNotificacionController.init()` debe llamarse en `DOMContentLoaded`.** Sin esto, el listener del click en la campana nunca se ata y el dropdown no abre. El badge sí aparece porque el polling lo arranca `main.js`, pero la interacción con la campana queda muda. Bug encontrado en verificación de 086d (2026-11-02). Aplica también al controller del admin (086c).
+- **Notificaciones: `leida_en` es la fuente de verdad.**
+- **Notificaciones: `notificar()` dentro de la transacción del cambio principal.**
+- **Notificaciones: destinatarios staff = admins activos (rol 1), excluyendo al generador.**
+- **Notificaciones: badge numérico, oculto si `no_leidas === 0`.** `PortalNotificacionView.renderBadge(n)` con `n > 0` muestra `n` o `99+`; con `n = 0` oculta el badge (`display: none`). Patrón estándar SaaS (Slack, Gmail, Salesforce).
+- **`F2.0a` al inicio de Fase 2, después de Fase 5.**
+- **Rol "Técnico" (id 23) existe en BD desde 2026-10-31.** Falta asignar permisos + usuarios (F2.35).
+- **Roles en modal dedicado, NO en Editar usuario** (4.2-hotfix1).
+- **Matriz de permisos en tabla grid, no cards** (4.3).
+- **El último admin activo no puede perder el rol Administrador** (4.2).
+- **`app.js` eliminado el 2026-10-30.** No se reintroduce.
 
 ---
 
 ## Aprendizajes recientes
 
-- **La industria separa tareas internas de pedidos de campo.** Sonar: Tasks vs Jobs. BSS/OSS: Sales Order → Work Order.
-- **Todo pedido de campo nace de un servicio.** Splynx, Sonar, UISP, BSS/OSS.
-- **`propiedad` de equipos no es siempre derivable de `tipo`.**
-- **UI ≠ backend.** Verificar ambas capas por separado.
-- **El guard SoD va en `requirePageAccess`, no en `requireOperation`.**
-- **Verificar el ciclo completo logout → login → cambio de rol.**
-- **Abrir DevTools → Network** durante verificaciones.
-- **Verificar que el dominio de la página tiene endpoint propio** antes de aplicar un gate de nivel 2.
-- **Los triggers BEFORE INSERT son trampa para INSERTs directos** (CODE-01).
-- **Los generados + UNIQUE en MySQL no restringen si la columna generada queda NULL** (CODE-02).
-- **Al probar un endpoint aislado, cerrar todas las pestañas de la app.** Usar `curl`.
-- **Auditoría uno por uno > auditoría en lote.**
-- **Un número que el dump ya contiene no se replica en un doc.**
-- **Un documento híbrido (hallazgos + estado) miente desde el día siguiente.**
-- **Un solo carácter puede romper todo el layout.** El `*` faltante en `styles.css`.
-- **En CSS, a igual especificidad, gana el archivo que aparece último.**
-- **phpMyAdmin no exporta CHECK constraints.** Verificar con `information_schema` o `mysqldump`.
-- **El mensaje del SIGNAL 45000 (MySQL 1644) es texto de negocio, no PII.**
-- **Un shim Strangler Fig permite migrar sin romper el contrato.** Fowler.
-- **Escribir la capa de modelos antes que repositorios** ordena las dependencias.
-- **Un método `count*` de repositorio debe replicar el filtro del endpoint que lo consume.** `ServicioRepository::countByNapId` (VERIFICACION.md §2.7).
-- **AI Studio ignora sistemáticamente la instrucción de indentación.** Verificar indentación como primer punto de auditoría de forma (VERIFICACION.md §2.8).
-- **`revocarByToken` no debe usar `rowCount()`.** Verificar con `findByToken !== null` (VERIFICACION.md §2.9).
-- **Los endpoints fuera del alcance de 139a/139b deben verificarse contra el esquema post-B28 antes de declarar el sistema estable.**
-- **`must_change_password` es un flag de ida y vuelta.** Si el backend lo enforca en `requireStaffAuth`, hay que ofrecer una ruta de escape. BUG-6.2 (cerrado en Tanda B).
-- **Cada `update()` de controller debe hacer `unset($input['id_X'])`** antes de pasar al service. Causa de BUG-6.3 y BUG-6.4.
-- **Tests de DELETE solo con dummies, nunca con seed.** Mi error con contrato 10.
-- **El contrato del frontend viejo (app.js) manda `id_*`, el backend nuevo espera `*_id`.** Cambio de contrato, no bug. Se resuelve en 140.
-- **Los bloques 30 y 31 eran redundantes con 139 y 140.** Absorbidos 2026-10-18.
-- **Los bloques 32 y 33 eran marcadores vacíos.** Absorbidos en Fases 5 y 4.
-- **Verificación por CLI, no por navegador, hasta 140.** `app.js` viejo tiene bugs pre-existentes (`restoreSession` no oculta `#login-overlay`; F5 pide login aunque `auth_state.php` devuelva `authenticated:true`). Forzar verificación visual contra frontend roto es perder tiempo. Toda verificación 139b–139d es `curl` + `mysql -e` + `php -l` + `findstr`.
-- **Formato de verificación obligatorio:** pasos numerados + comando + Esperado + precondición de abort. El humano ejecuta, pega salidas literales. El agente audita. Ver `docs/METODOLOGIA_DESARROLLO_IA.md` § 5.5.
-- **El trigger 1644 se mapea correctamente a 422.** Confirmado en runtime en Tanda B: `PUT /api_tickets.php` con `Cerrado→Abierto` → 422 con mensaje exacto del trigger. La rama 1644 de `Response::fromException` funciona.
-- **El seed RBAC del Operador está incompleto.** Tiene `crear`/`editar` pero no `leer`/`eliminar` en tickets y tareas. Deuda 139c-4.
-- **Los `index()` de Tanda A/B no tienen JOINs.** Los campos enriquecidos (`total_olts`, `nap_codigo`, `servicio_alias`, `cliente_nombres`, etc.) desaparecen del JSON. Deuda 139c-1.
-- **Verificar el conteo esperado contra la BD real, no contra la memoria.** En Tanda A el conteo `paginas` era 22 (no 23, por el hueco en id=3). En Tanda B la auditoría tenía 8 filas (no 7, porque son 2 UPDATE). En Tanda C el script tiene 22 checks, no 12 (los checks binarios suman más).
-- **`Auth::jsonError()` no usa `JSON_UNESCAPED_UNICODE`.** Los mensajes con acentos salen como `\u00f1`. Rompe asserts textuales. Deuda 139d-B-1.
-- **El código fuente dentro del webroot es una clase entera de vulnerabilidades.** La mitigación correcta es `public/` + `src/`, no `.htaccess`. Estándar de Laravel, Symfony, CodeIgniter, manual de PHP. Spec 139e.
-- **AI Studio reescribe archivos "modificados" perdiendo métodos.** En Tanda C borró `findModulosPermitidosByRoles` (rompe login), revirtió `guardarMatriz` a SQL inline, cambió `insertIgnore` a array. Verificar contra el dump antes de aplicar.
-- **Body JSON en subproceso CLI de Windows se corrompe con `escapeshellarg`.** Usar `base64_encode`/`base64_decode`.
-- **`Set-Content -Encoding utf8` en PowerShell 5.1 agrega BOM.** Para JSONs enviados a `php://input`, usar `[System.IO.File]::WriteAllText` (sin BOM). Síntoma: `json_decode` devuelve `null`, backend cae a `$_POST` vacío, responde 400 "Credenciales incompletas". Detectable leyendo los primeros 3 bytes del archivo (`239,187,191` = BOM).
-- **`findstr /S /C:"require" *.php | findstr /C:"conexion.php"` produce falsos positivos.** El prefijo `<archivo>:` del output de `findstr /S` matchea el segundo `findstr` por la parte `conexion.php:` del prefijo. Para verificar "0 requires vivos", buscar el string literal completo (`findstr /C:"require_once __DIR__ . '/conexion.php'"`), no con pipes.
-- **`<?php` debe ser la primera línea del archivo (byte 0).** Comentario `// filename` va en línea 2, no antes. Un `// filename` antes de `<?php` se emite como output literal antes del parseo; `header()` falla con "headers already sent" y el body JSON/CSS llega con prefijo de texto. En Tanda D, AI Studio devolvió los 4 archivos con `// filename` en línea 1; rechazados, reordenados manualmente.
-- **Sobrescribir archivo completo, no solo la línea a cambiar.** En Tanda E, se aplicó el `<?php` corregido del test migrado pero no se sobrescribió el resto del archivo: los 2 comentarios obsoletos (`// Depende de que conexion.php tenga el guard CLI`) y el `require_once conexion.php` original seguían en su lugar. Síntoma: `findstr` seguía devolviendo 3 hits. Lección: al reescribir un archivo, `Ctrl+A` + `Supr` + pegar completo, nunca editar por partes.
-- **`tests/audit_context.test.php` era el único bloqueante del borrado de `conexion.php`.** `AGENTS.md` ya lo declaraba como "se migra a `core/Auth.php` en 139d (ítem explícito de esa spec)". El plan de Tanda E (§6, paso 7) asumía `php tests/run.php` verde sin mencionar la migración. Lección: cruzar el plan contra las deudas conocidas del dump antes de ejecutar el borrado. El orden correcto es: (1) migrar el archivo, (2) verificar 0 refs, (3) borrar `conexion.php`, (4) correr harness.
-
-- **Bug latente del router con `php -S`.** `public/router.php` tenia `$path = __DIR__ . $uri;` sin slash. Con Apache no se ejecuta (`.htaccess` con `RewriteCond !-f` solo invoca el router para rutas no existentes). Con `php -S` + router script, el router se ejecuta siempre y el fallback devolvia 404 a `/login.php`. Fix: `return false;` en el fallback. `php -S` sirve el archivo y lo ejecuta como PHP. Ver ADR 018.
-
-- **`debug_login.php` colateral.** El script temporal con credenciales hardcodeadas (`admin` / `admin123`) se colo al primer commit de 139e. Borrado en commit siguiente. Regla: los scripts de diagnostico que contienen credenciales se borran ANTES del `git add -A`, o se crean fuera de `src/tests/`.
-
-- **MariaDB se apaga solo.** Durante la verificacion E2E, MariaDB se detuvo sin razon aparente. El 500 de `/login.php` con `"Error de base de datos"` era el PDOException 2002 mapeado a 500 generico. Leccion: cuando aparezca 500 en runtime y el codigo no cambio, verificar `netstat -ano | findstr :3306` ANTES de tocar codigo.
-
-- **`Set-Content -Encoding UTF8` en PowerShell 5.1 agrega BOM.** Tambien corrompe caracteres no-ASCII que vienen de cmd (CP850) → mojibake doble. Para archivos UTF-8 sin BOM: `[System.IO.File]::WriteAllText($p, $c, (New-Object System.Text.UTF8Encoding $false))` con `$c` ya construido desde strings ASCII. Si el contenido necesita acentos, construir via `[char]0xNNNN` para cada caracter no-ASCII. Aplicado al ADR 018.
-
-Aprendizajes completos: `docs/REFERENCIA.md` §4.
-Lecciones de verificación: `docs/VERIFICACION.md`.
+- **`ApiClient.js` no debe asumir `window.Session`.** Debe elegir según `window.__appContext` (`'portal'` → `PortalSession`, default → `Session`). Bug encontrado en 096a (2026-11-01): el portal mandaba el token del admin en cada request, y el backend del portal respondía 401 "No autenticado". Fix: setear `__appContext` en `js/portal/main.js` ANTES de cualquier fetch, y adaptar `ApiClient` para consultar el flag.
+- **El orden de carga importa.** `js/portal/main.js` se ejecuta en `DOMContentLoaded`, pero el flag `__appContext` debe existir en el scope global antes de que cualquier módulo llame `ApiClient`. Se setea al inicio del IIFE de `main.js` (top-level, no dentro del `DOMContentLoaded`).
+- **`portal_cliente.php` con `router.php` no funciona en Apache.** `router.php` solo aplica con `php -S`. En Apache, `/portal` da 404. Se resuelve con `.htaccess` (RewriteRule) o usando `http://localhost/portal_cliente.php` directamente. Deuda `PORTAL-URL-REWRITE` (Fase 2).
+- **La auto-creación de credenciales del portal solo aplica a clientes NUEVOS.** Los clientes del seed (creados antes de A2-B.3, 2026-10-31) no tienen credencial y no pueden entrar al portal. Para verificar módulos del portal con datos del seed, hay que crear credencial manualmente (scripts `seed_portal.php` y `seed_segundo_cliente.php`, ya borrados). Lección de 096e (2026-11-01).
+- **La UI del admin no muestra el `password_temporal` al crear cliente.** `ClienteController.save()` descarta `res.credencial.password_temporal`. Gap `PORTAL-CREDENCIAL-PASSWORD-OCULTA` (Fase 2). Mientras tanto, el `password_temporal` se ve en DevTools → Network → `registrar_cliente.php` → Response.
+- **La UI del admin no tiene botón de "Resetear credencial del portal".** `api_cliente_credenciales.php` existe (A2-B.3) pero sin UI. Gap `PORTAL-CREDENCIAL-UI` (Fase 2).
+- **El backend del portal NO devuelve `nombres`/`apellidos`/`cedula` en facturas ni pagos.** A2-B.4 decidió no repetir PII (el cliente ya se conoce a sí mismo). Los Views de detalle leen estos datos de `PortalSession.get().cliente` con fallback a `factura.nombres`/`pago.nombres`. Lección de 096b (2026-11-01). **Aplica a 096c (pagos) y 096d (tickets).**
+- **`startPolling()` debe hacer `_pollOnce()` inicial, no solo `setInterval(30s)`.** Sin el fetch inicial, el badge queda vacío hasta el primer tick. Además, `init()` no debe llamar `startPolling()` sin sesión: se arranca desde `initApp()` post-login (admin) o `window.__onPortalLoginSuccess` post-login/restore (portal).
+- **`NotificacionController.init()` (admin) y `PortalNotificacionController.init()` (portal) deben llamarse en `DOMContentLoaded`.** Sin esto, el listener del click en la campana nunca se ata y el dropdown no abre. El badge sí aparece porque el polling lo arranca `main.js`, pero la interacción con la campana queda muda. Bug encontrado en 086d-fix (2026-11-02). El controller del admin (086c) ya lo hacía.
+- **Endpoints separados del portal no se reutilizan con los admin.** BOLA/IDOR.
+- **Discriminador `tipo_autor` forzado en el service.** Zendesk `public`, Salesforce `IsPublished`, ServiceNow `work_notes` vs `comments`.
+- **`Cerrado` es terminal para el cliente del portal.** Sonar "closed ticket cannot be reopened". Zendesk: *"Closed is forever"*. El botón "Responder" se deshabilita en la UI. El backend lanza `DomainException` 422. Doble defensa.
+- **Estado del ticket NO cambia cuando el cliente responde.** Zendesk/Jira SM/Salesforce/ServiceNow/Splynx.
+- **No crear tareas derivadas.** Jira SM las convierte en nota interna.
+- **`usuario_creador_id=NULL` en tickets del portal.** El creador es el cliente (`cliente_id`).
+- **URLs de notificación cliente vs staff.** `/portal/*` vs `/*`.
+- **Notificaciones: `leida_en` (timestamp) > enum `estado`.**
+- **Notificaciones: Observer síncrono en la transacción.** Transactional Outbox.
+- **Portal auth: CSPRNG, no hardcoded.** OWASP ASVS 2.5.1 + 2.3.1.
+- **Portal auth: `must_change_password` en el middleware.** Laravel `EnsurePasswordIsNotExpired`.
+- **Portal: upload con `finfo_file()` + CSPRNG + `.htaccess`.**
+- **Portal PDF: `window.print()` con popup HTML print-friendly, sin librerías.** El usuario elige "Guardar como PDF" en el diálogo nativo. Splynx usa el mismo approach para facturas no fiscales. Stripe requiere `wkhtmltopdf` (prohibido por §1). Aviso de "no fiscal" obligatorio: SENIAT exige número de control y RIF que el esquema no tiene. Lección de 096f (2026-11-02).
+- **`formatDual` reusado en tabla, detalle y PDF.** Un solo helper, tres contextos. Si el formato cambia, se cambia en un solo lugar. Lección de 096f (2026-11-02).
+- **`CREATE TRIGGER ... BEGIN ...; END;` en un `.sql` requiere `DELIMITER`.** Lección §2.41.
+- **Tests que llaman `Auth::setAuditContext` deben resetear `@app_credencial_id` en teardown.** Lección §2.42.
+- **Tests que crean facturas/pagos: `notificaciones` antes que `clientes`.** Lección §2.43.
+- **`FacturaService::crear` y `PagoService::actualizar` notifican solo al cliente.** Lección §2.44.
+- **`@app_credencial_id` reset antes de DELETE en `clientes_credenciales`.** Lección §2.45.
 
 ---
 
-## Documentación clave (referencia rápida)
+## Referencias rápidas
 
-- `docs/GOBERNANZA.md` — mapa del ecosistema documental.
-- `docs/constitution.md` — principios innegociables.
-- `AGENTS.md` — reglas operativas del agente.
-- `docs/METODOLOGIA_DESARROLLO_IA.md` — ciclo de trabajo.
-- `docs/METODOLOGIA_AUDITORIA_IA.md` — marco de auditoría.
-- `docs/AUDITORIA_2026.md` — hallazgos canónicos (foto al 2026-10-11).
-- `docs/ROADMAP.md` — plan por fases y estado de specs.
-- `docs/ARQUITECTURA.md` — cómo está construido.
-- `docs/BD.md` — esquema de base de datos.
-- `docs/REFERENCIA.md` — estándares, frases de defensa, industria descartada.
-- `docs/VERIFICACION.md` — lecciones de verificación.
-- `docs/ADR/` — decisiones arquitectónicas (001–017).
+| Qué | Dónde |
+|---|---|
+| Specs y su estado | `docs/ROADMAP.md` |
+| Detalle histórico de Fase 1 | `docs/HISTORICO_FASE1.md` (⚠️ parcial) |
+| Detalle A2-B.1/3/4/5 | `docs/ROADMAP.md` §Histórico + `docs/ARQUITECTURA.md` §Notificaciones/§Portal |
+| Plan del bloque activo | `PLAN DEL BLOQUE ACTIVO` (externo) |
+| Cómo está construido | `docs/ARQUITECTURA.md` |
+| Esquema de BD | `bd_redytelca.sql` + `bd_redytelca_schema.sql` + `docs/BD.md` |
+| Hallazgos canónicos | `docs/AUDITORIA_2026.md` |
+| Estándares + defensa | `docs/REFERENCIA.md` |
+| Lecciones de verificación | `docs/VERIFICACION.md` |
+| Reglas del repo | `AGENTS.md` |
+| Reglas del proceso | `docs/METODOLOGIA_DESARROLLO_IA.md` |
+| Gobernanza documental | `docs/GOBERNANZA.md` |
+| Decisiones arquitectónicas | `docs/ADR/001`–`020` |
+| Modelo de moneda dual | `docs/REFERENCIA.md` §6 |
+| Ciclo estados contratos/servicios | `docs/BD.md` §contratos + `AGENTS.md` §Trampas |
+| Notificaciones backend | `src/services/NotificacionService.php` + `ARQUITECTURA.md` §Notificaciones |
+| Notificaciones UI staff (086c) | `public/js/models/NotificacionModel.js` + `views/NotificacionView.js` + `controllers/NotificacionController.js` |
+| Portal auth UI (096a) | `public/portal_cliente.php` + `public/portal.css` + `public/js/portal/core/{Session,Router}.js` + `js/portal/controllers/AuthController.js` + `js/portal/views/AuthView.js` + `js/portal/main.js` |
+| Portal servicios UI (096e) | `public/js/portal/models/ServicioModel.js` + `views/ServicioView.js` + `controllers/ServicioController.js`. Página `portal-servicios` en `portal_cliente.php`. |
+| Portal facturas UI (096b) | `public/js/portal/models/FacturaModel.js` + `views/FacturaView.js` + `controllers/FacturaController.js`. Página `portal-facturas` + modal de detalle en `portal_cliente.php`. `FacturaView` lee nombre/cédula de `PortalSession.get().cliente`. |
+| Portal pagos UI (096c) | `public/js/portal/models/MetodoPagoModel.js` + `models/PagoModel.js` + `views/PagoView.js` + `controllers/PagoController.js`. Página `portal-pagos` + 2 modales. `PortalPagoModel.downloadComprobante()` hace `fetch` + blob. |
+| Portal tickets UI (096d) | `public/js/portal/models/TicketModel.js` + `views/TicketView.js` + `controllers/TicketController.js`. Página `portal-tickets` + 2 modales (detalle con hilo, form de creación). Ticket `Cerrado` deshabilita "Responder". Backend pre-req: `api_portal_categorias_ticket.php` + `CategoriaTicketService::listarActivas()` + `CategoriaTicketController::indexPortal()`. Búsqueda por texto NO implementada (paginación server-side). |
+| Portal PDF UI (096f) | `public/js/portal/views/FacturaPdfView.js`. Genera popup print-friendly con `window.print()`. Sin librerías (§1). PDF informativo, no fiscal. `formatDual` reusado de `FacturaView`. Botón "Imprimir / PDF" en `FacturaView.renderDetailModal`. |
+| **Portal notif cliente UI (086d)** | **`public/js/portal/models/NotificacionModel.js` + `views/NotificacionView.js` + `controllers/NotificacionController.js`. Campana en topbar + dropdown + modal de detalle. `portal.css` §`portal-notif-*`. `main.js` registra `window.__onPortalLoginSuccess` → `PortalNotificacionController.startPolling()`. `_clearSession()` detiene el polling y limpia el modelo. `init()` en `DOMContentLoaded` (086d-fix).** |
+| Portal auth backend | `src/services/PortalAuthService.php` + `ClienteCredencialService.php` |
+| Portal facturas/pagos/servicios backend | `src/services/PortalFacturaService.php` + `PortalPagoService.php` + `PortalServicioService.php` |
+| Portal tickets backend | `src/services/PortalTicketService.php` + `TicketRespuestaService::crearRespuestaCliente` |
+| Portal categorías ticket backend | `public/api_portal_categorias_ticket.php` + `CategoriaTicketService::listarActivas()` + `CategoriaTicketController::indexPortal()` |
+| Portal notificaciones backend | `src/services/NotificacionService.php` + `api_portal_notificaciones.php` + `NotificacionPortalController` |
+
+---
+
+## Cadena de operaciones (industria)
+
+**Confirmado 2026-10-27 (Splynx, Oracle, Entel).**
+
+Cliente → Servicio (`pendiente`) → Contrato (`vigente`) → Pedido de instalación (`pendiente` → `asignado` → `en_curso` → `completado`) → Servicio (`activo`) → Primera factura.
+
+- El **servicio va primero**, en `pendiente`.
+- El **contrato va segundo**, antes de la instalación.
+- El **pedido de instalación va tercero**.
+- El **servicio pasa a `activo`** al completar el pedido. Hoy es manual; Fase 7 automatiza.
 
 ---
 
 ## Infraestructura
 
-- **Tests:** `php tests/run.php`. Smoke + auditoría. Además: `verify_136f.php`, `verify_137g.php` (13/13), `verify_138.php` (89/89), `verify_139d_a.php` (23/23), `verify_139d_b.php` (6/6), `verify_139d_c.php` (22/22). **`verify_139.php` consolidado NO se creó** (el plan de 139d lo mencionaba como criterio de cierre, pero las tandas se verificaron por separado: A 23/23, B 6/6, C 22/22, D 8/8 + restore 5/5, E 0-refs + del + 5× php -l + harness 9/9). Deuda menor, no bloquea 139e.
-- **Backup:** `C:\backups\` + `app.js.bak` en raíz. SQL con fecha movidos a `C:\backups\redytelca-migraciones\`.
-- **Entorno de desarrollo:** XAMPP (Apache 2.4.58 + PHP 8.2.12 + MariaDB 10.4.32). `http://127.0.0.1/redytelca/`.
+- **URL de la plataforma (para comandos de pruebas):** `http://localhost/` — Apache, puerto 80, DocumentRoot apuntando a `public/`.
+- **Portal:** `http://localhost/portal_cliente.php` (Apache sin rewrite aún). Deuda `PORTAL-URL-REWRITE` (Fase 2): añadir `.htaccess` con RewriteRule en `public/`.
+- **Fallback sin vhost:** `php -S localhost:8000 -t public public/router.php` desde la raíz. `DOC-12` cerrado 2026-10-31.
+- **Tests:** `php src/tests/run.php`. 9/9 + `verify_a2b1.php` 14/14 + `verify_a2b3.php` 37/37 + `verify_a2b5.php` 30/30 (2026-11-01). **`verify_a2b4.php` NO existe** (deuda `A2-B.4-TEST`, pendiente de crear en Fase 2). 086d verificado en browser (no requiere archivo de test formal; es UI).
+- **Migraciones SQL aplicadas:**
+  - `BD-B3.11-01` (2026-10-29): `configuracion_empresa.logo_path_sidebar`.
+  - **D3 (2026-11-01):** `UPDATE paginas SET modulo_id = 3 WHERE url_pagina = 'notificaciones'` + migración de pivotes (`rol_modulo_pagina`, `rol_modulo_permiso`) para `pagina_id=19` a `modulo_id=3`. Verificado en BD viva 2026-11-01. Backup: `C:\backups\bd_redytelca_pre-fase5-notif-modulo3.sql`.
+  - **Regeneración `bd_redytelca_schema.sql` (2026-11-01):** sincronizado con la BD viva post-D3. 44 tablas, 145 triggers, 4 vistas, seed de 8 tablas de catálogo, sin PII. Backup del viejo: `bd_redytelca_schema.sql.bak-2026-11-01`.
+- **Backup BD:** `C:\backups\` + `C:\backups\redytelca-migraciones\`.
+- **Backup del repo:** backup manual + renombrar a `.bak`. **Sin git.**
+- **Tokens de prueba:** `C:\backups\token-admin.txt`, `C:\backups\token-operador.txt`. Password admin por defecto: `admin123`.
+- **Credenciales de portal creadas para verificación de Fase 5:**
+  - `marcelo@gmail.com` (cliente_id=1): password `PortalTest2026!`, `must_change_password=0`. Servicios del cliente 1 (puede ser 0).
+  - Segundo cliente (creado por `seed_segundo_cliente.php`, ya borrado): asignó credencial a un cliente con servicios. Username = su `correo`. Password `PortalTest2026!`. `must_change_password=0`. Anotar el `cliente_id`/`username` si se necesita para regresión.
+  - `reset_credenciales.php` (ya borrado) reseteó todas las contraseñas a `PortalTest2026!` con `must_change_password=0`. Sirve para verificar 096c con un cliente que tenga facturas.
+- **Entorno:** XAMPP (Apache 2.4.58 + PHP 8.2.12 + MariaDB 10.4.32).
 - **Skills disponibles:** `sdd`, `redytelca-bd`, `redytelca-auth`, `redytelca-auditoria`.

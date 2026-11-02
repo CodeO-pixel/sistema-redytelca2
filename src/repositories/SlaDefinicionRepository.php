@@ -50,12 +50,16 @@ final class SlaDefinicionRepository extends BaseRepository
 
     /**
      * Obtiene todas las definiciones SLA ordenadas por categoría y prioridad.
+     * Incluye el nombre de la categoría (categoria_nombre).
      *
      * @return array
      */
     public function findAllOrderedByCategoria(): array
     {
-        $sql = "SELECT * FROM {$this->table} ORDER BY categoria_id ASC, prioridad ASC";
+        $sql = "SELECT sd.*, ct.nombre AS categoria_nombre
+                FROM {$this->table} sd
+                LEFT JOIN categorias_ticket ct ON ct.id = sd.categoria_id
+                ORDER BY sd.categoria_id ASC, sd.prioridad ASC";
         $stmt = $this->prepareAndExecute($sql);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }

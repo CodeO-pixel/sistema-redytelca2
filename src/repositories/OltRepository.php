@@ -18,12 +18,18 @@ final class OltRepository extends BaseRepository
 
     /**
      * Obtiene todas las OLTs ordenadas por ID ascendente.
+     * Incluye el nombre del nodo (nombre_nodo) y la cantidad de NAPs asociadas (total_naps).
      *
      * @return array
      */
     public function findAllOrderedById(): array
     {
-        $sql = "SELECT * FROM {$this->table} ORDER BY id ASC";
+        $sql = "SELECT o.*, 
+                       nd.nombre AS nombre_nodo, 
+                       (SELECT COUNT(*) FROM naps na WHERE na.olt_id = o.id) AS total_naps 
+                FROM {$this->table} o 
+                INNER JOIN nodos nd ON nd.id = o.nodo_id 
+                ORDER BY o.id ASC";
         $stmt = $this->prepareAndExecute($sql);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }

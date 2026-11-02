@@ -18,12 +18,16 @@ final class NodoRepository extends BaseRepository
 
     /**
      * Obtiene todos los nodos ordenados por nombre ascendente.
+     * Incluye la columna adicional `total_olts` con la cantidad de OLTs asociadas.
      *
      * @return array
      */
     public function findAllOrderedByNombre(): array
     {
-        $sql = "SELECT * FROM {$this->table} ORDER BY nombre ASC";
+        $sql = "SELECT n.*, 
+                       (SELECT COUNT(*) FROM olts o WHERE o.nodo_id = n.id) AS total_olts 
+                FROM {$this->table} n 
+                ORDER BY n.nombre ASC";
         $stmt = $this->prepareAndExecute($sql);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }

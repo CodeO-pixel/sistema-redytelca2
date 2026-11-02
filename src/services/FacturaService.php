@@ -14,6 +14,11 @@ use App\Repositories\PagoRepository;
 
 /**
  * Servicio para la gestión de facturas.
+ *
+ * A2-B.1: integra NotificacionService en crear() (factura emitida) y en
+ * materializarVencimientos() (factura vencida). Ambas operaciones son
+ * transaccionales: si la notificación falla, el cambio de factura hace
+ * rollback.
  */
 final class FacturaService extends BaseService
 {
@@ -26,6 +31,9 @@ final class FacturaService extends BaseService
     /** @var PagoRepository */
     private PagoRepository $pagoRepo;
 
+    /** @var NotificacionService */
+    private NotificacionService $notificacionService;
+
     /**
      * Constructor del servicio.
      *
@@ -37,10 +45,14 @@ final class FacturaService extends BaseService
         $this->facturaRepo = new FacturaRepository($pdo);
         $this->servicioRepo = new ServicioRepository($pdo);
         $this->pagoRepo = new PagoRepository($pdo);
+        $this->notificacionService = new NotificacionService($pdo);
     }
 
     /**
      * Crea una nueva factura.
+     *
+     * Notifica al cliente vía `eventoFacturaEmitida`.
+     * Transaccional: si la notificación falla, la factura hace rollback.
      *
      * @param array $datos
      * @return int
@@ -72,7 +84,27 @@ final class FacturaService extends BaseService
 
         $datos['estado'] = 'pendiente';
 
-        return $this->facturaRepo->create($datos);
+        $closure = function () use ($datos) {
+            $facturaId = $this->facturaRepo->create($datos);
+
+            $servicio = $this->servicioRepo->findById((int) $datos['servicio_id']);
+            if ($servicio && !empty($servicio['cliente_id'])) {
+                $this->notificacionService->eventoFacturaEmitida(
+                    $facturaId,
+                    (int) $servicio['cliente_id'],
+                    (string) ($datos['periodo'] ?? ''),
+                    (float) ($datos['monto'] ?? 0),
+                    (string) ($datos['moneda'] ?? 'USD')
+                );
+            }
+
+            return $facturaId;
+        };
+
+        if ($this->pdo->inTransaction()) {
+            return $closure();
+        }
+        return $this->transaction($closure);
     }
 
     /**
@@ -178,20 +210,47 @@ final class FacturaService extends BaseService
     }
 
     /**
-     * Materializa los vencimientos de las facturas pendientes cuya fecha de vencimiento ya pasó.
+     * Materializa los vencimientos de las facturas pendientes cuya fecha
+     * de vencimiento ya pasó.
+     *
+     * Notifica al cliente vía `eventoFacturaVencida` por cada factura
+     * actualizada. La operación completa es transaccional: si la
+     * notificación falla en cualquier factura, todas las actualizaciones
+     * de este lote hacen rollback y el caller recibe la excepción.
+     * Datos consistentes > resiliencia en tesis.
      *
      * @return int Número de facturas actualizadas.
      */
     public function materializarVencimientos(): int
     {
         $vencidas = $this->facturaRepo->findPendientesVencidas();
-        $count = 0;
-
-        foreach ($vencidas as $factura) {
-            $this->facturaRepo->update((int) $factura['id'], ['estado' => 'vencida']);
-            $count++;
+        if (empty($vencidas)) {
+            return 0;
         }
 
-        return $count;
+        $closure = function () use ($vencidas) {
+            $count = 0;
+            foreach ($vencidas as $factura) {
+                $this->facturaRepo->update((int) $factura['id'], ['estado' => 'vencida']);
+
+                $servicio = $this->servicioRepo->findById((int) $factura['servicio_id']);
+                if ($servicio && !empty($servicio['cliente_id'])) {
+                    $this->notificacionService->eventoFacturaVencida(
+                        (int) $factura['id'],
+                        (int) $servicio['cliente_id'],
+                        (string) $factura['periodo'],
+                        (float) $factura['monto'],
+                        (string) ($factura['moneda'] ?? 'USD')
+                    );
+                }
+                $count++;
+            }
+            return $count;
+        };
+
+        if ($this->pdo->inTransaction()) {
+            return $closure();
+        }
+        return $this->transaction($closure);
     }
 }

@@ -59,6 +59,25 @@ final class UsuarioRepository extends BaseRepository
     }
 
     /**
+     * Obtiene todos los usuarios con su última fecha de conexión
+     * (MAX de sesiones.creado_en), ordenados por username ASC.
+     * Excluye estado='Inactivo' (baja lógica invisible al listado).
+     *
+     * @return array
+     */
+    public function findAllWithUltimaConexion(): array
+    {
+        $sql = "SELECT u.id, u.username, u.email, u.must_change_password,
+                u.email_verified, u.estado,
+                (SELECT MAX(creado_en) FROM sesiones WHERE usuario_id = u.id) AS ultima_conexion
+                FROM {$this->table} u
+                WHERE u.estado <> 'Inactivo'
+                ORDER BY u.username ASC";
+        $stmt = $this->pdo->query($sql);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
      * Obtiene los usuarios filtrados por estado.
      *
      * @param string $estado

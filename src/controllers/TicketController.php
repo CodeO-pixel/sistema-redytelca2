@@ -27,11 +27,15 @@ final class TicketController extends BaseController
         $this->render(['status' => 'success', 'tickets' => $tickets], 200);
     }
 
-    public function store(): void
+    public function store(array $staffSession): void
     {
         $input = $this->input();
+        // El creador del ticket viene de la sesión autenticada, no del body.
+        unset($input['usuario_creador_id']);
+
         $validated = TicketValidator::validateCreate($input);
-        $this->ticketService->crear($validated);
+        $usuarioId = (int) ($staffSession['id_usuario'] ?? 0);
+        $this->ticketService->crear($validated, $usuarioId);
         $this->render(['status' => 'success', 'message' => 'Ticket creado correctamente'], 200);
     }
 

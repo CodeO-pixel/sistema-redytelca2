@@ -163,12 +163,15 @@ final class UsuarioService extends BaseService
      * que actualiza todas las filas de sesiones del usuario (sin el LIMIT 20
      * de findByUsuarioId) y fija motivo_cierre='revocada_por_admin'.
      *
+     * Las dos operaciones (revocar sesiones + actualizar estado) van en una
+     * transacción: si el update falla, no queda el usuario Activo con las
+     * sesiones ya revocadas.
+     *
      * @param int $id
      * @return void
      * @throws NotFoundException
      * @throws DomainException
      */
-    
     public function desactivar(int $id): void
     {
         if (!$this->usuarioRepo->exists($id)) {
@@ -188,13 +191,18 @@ final class UsuarioService extends BaseService
             throw new DomainException('No puedes desactivar al único administrador activo del sistema.');
         }
 
-        $this->sesionRepo->revocarTodasByUsuarioId($id);
-
-        $this->usuarioRepo->update($id, ['estado' => 'Inactivo']);
+        $this->transaction(function () use ($id) {
+            $this->sesionRepo->revocarTodasByUsuarioId($id);
+            $this->usuarioRepo->update($id, ['estado' => 'Inactivo']);
+        });
     }
 
     /**
      * Cambia la contraseña de un usuario validando la actual.
+     *
+     * Revoca TODAS las sesiones abiertas del usuario tras el cambio:
+     * si un atacante tenía un token robado, deja de servir en el
+     * siguiente request.
      *
      * @param int $id
      * @param string $passwordActual
@@ -218,10 +226,13 @@ final class UsuarioService extends BaseService
             throw new ValidationException(['password' => 'La nueva contraseña debe tener al menos 8 caracteres.']);
         }
 
-        $this->usuarioRepo->update($id, [
-            'password' => password_hash($passwordNueva, PASSWORD_DEFAULT),
-            'must_change_password' => 0
-        ]);
+        $this->transaction(function () use ($id, $passwordNueva) {
+            $this->usuarioRepo->update($id, [
+                'password' => password_hash($passwordNueva, PASSWORD_DEFAULT),
+                'must_change_password' => 0
+            ]);
+            $this->sesionRepo->revocarTodasByUsuarioId($id);
+        });
     }
 
     /**
@@ -403,34 +414,8 @@ final class UsuarioService extends BaseService
      */
     public function listarConRoles(): array
     {
-        $sqlUsuarios = "
-            SELECT u.id, u.username, u.email, u.must_change_password,
-                   u.email_verified, u.estado,
-                   (SELECT MAX(creado_en) FROM sesiones WHERE usuario_id = u.id) AS ultima_conexion
-            FROM usuarios u ORDER BY u.username ASC
-        ";
-        $stmtUsuarios = $this->pdo->query($sqlUsuarios);
-        $usuarios = $stmtUsuarios->fetchAll(\PDO::FETCH_ASSOC);
-
-        $sqlRoles = "
-            SELECT ur.usuario_id, r.id AS id_rol, r.nombre_rol
-            FROM usuario_rol ur INNER JOIN rol r ON r.id = ur.rol_id
-            ORDER BY r.id
-        ";
-        $stmtRoles = $this->pdo->query($sqlRoles);
-        $rolesData = $stmtRoles->fetchAll(\PDO::FETCH_ASSOC);
-
-        $rolesPorUsuario = [];
-        foreach ($rolesData as $row) {
-            $idU = (int) $row['usuario_id'];
-            if (!isset($rolesPorUsuario[$idU])) {
-                $rolesPorUsuario[$idU] = [];
-            }
-            $rolesPorUsuario[$idU][] = [
-                'id_rol' => (int) $row['id_rol'],
-                'nombre_rol' => $row['nombre_rol']
-            ];
-        }
+        $usuarios = $this->usuarioRepo->findAllWithUltimaConexion();
+        $rolesPorUsuario = $this->usuarioRolRepo->findAllGrouped();
 
         foreach ($usuarios as &$u) {
             $idU = (int) $u['id'];

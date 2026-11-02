@@ -43,6 +43,36 @@ final class UsuarioRolRepository extends BaseRepository
     }
 
     /**
+     * Obtiene TODOS los roles agrupados por usuario_id, ordenados por rol_id ASC.
+     * Devuelve [usuario_id => [['id_rol' => int, 'nombre_rol' => string], ...], ...].
+     * Usado por UsuarioService::listarConRoles().
+     *
+     * @return array
+     */
+    public function findAllGrouped(): array
+    {
+        $sql = "SELECT ur.usuario_id, r.id AS id_rol, r.nombre_rol
+                FROM {$this->table} ur
+                INNER JOIN rol r ON r.id = ur.rol_id
+                ORDER BY r.id";
+        $stmt = $this->pdo->query($sql);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $uid = (int) $row['usuario_id'];
+            if (!isset($grouped[$uid])) {
+                $grouped[$uid] = [];
+            }
+            $grouped[$uid][] = [
+                'id_rol' => (int) $row['id_rol'],
+                'nombre_rol' => $row['nombre_rol']
+            ];
+        }
+        return $grouped;
+    }
+
+    /**
      * Elimina todos los roles asignados a un usuario.
      *
      * @param int $usuarioId
@@ -93,5 +123,35 @@ final class UsuarioRolRepository extends BaseRepository
         $sql = "SELECT COUNT(DISTINCT u.id) FROM usuarios u INNER JOIN {$this->table} ur ON ur.usuario_id = u.id WHERE ur.rol_id = 1 AND u.id <> ? AND u.estado = 'Activo'";
         $stmt = $this->prepareAndExecute($sql, [$idUsuario]);
         return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Devuelve los IDs de los usuarios activos que tienen un rol específico,
+     * excluyendo opcionalmente a uno.
+     *
+     * Usado por NotificacionService::notificarStaffAdmins() para notificar
+     * a todos los administradores activos excepto al generador del evento.
+     *
+     * @param int      $rolId
+     * @param int|null $excluirUsuarioId
+     * @return int[]
+     */
+    public function findActivosByRolId(int $rolId, ?int $excluirUsuarioId = null): array
+    {
+        $sql = "SELECT DISTINCT u.id
+                FROM usuarios u
+                INNER JOIN {$this->table} ur ON ur.usuario_id = u.id
+                WHERE ur.rol_id = ? AND u.estado = 'Activo'";
+        $params = [$rolId];
+
+        if ($excluirUsuarioId !== null && $excluirUsuarioId > 0) {
+            $sql .= " AND u.id <> ?";
+            $params[] = $excluirUsuarioId;
+        }
+
+        $sql .= " ORDER BY u.id";
+
+        $stmt = $this->prepareAndExecute($sql, $params);
+        return array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN, 0));
     }
 }
