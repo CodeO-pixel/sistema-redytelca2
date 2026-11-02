@@ -9,8 +9,8 @@ Documentación de REDYTELCA. Cada archivo tiene un rol único. Si dos archivos d
 | Archivo | Rol |
 |---------|-----|
 | `constitution.md` | Principios innegociables del proyecto. Ley superior. |
-| `METODOLOGIA_DESARROLLO_IA.md` | Cómo se trabaja en este proyecto (ciclo, roles, verificación). |
-| `METODOLOGIA_AUDITORIA_IA.md` | Marco de auditoría: 6 pasadas × 10 capas × contexto ISP. |
+| `METODOLOGIA_DESARROLLO.md` | Cómo se trabaja en este proyecto (ciclo, roles, verificación). |
+| `METODOLOGIA_AUDITORIA.md` | Marco de auditoría: 6 pasadas × 10 capas × contexto ISP. |
 | `GOBERNANZA.md` | Mapa del ecosistema documental. Dónde vive cada cosa, reglas de conformidad. |
 
 ## Estado y planificación
